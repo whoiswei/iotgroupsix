@@ -11,6 +11,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+# 讀取 .env 檔案
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +32,17 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# 為了讓 Cloudflare Tunnel 等 HTTPS 隧道可以順利登入 (防止 CSRF 403 錯誤)
+csrf_trusted = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if csrf_trusted:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted.split(',') if origin.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'https://*.trycloudflare.com',
+        'https://*.ngrok.io',
+        'https://*.ngrok-free.app',
+        'https://*.loca.lt',
+    ]
 
 # Application definition
 
@@ -73,7 +89,7 @@ WSGI_APPLICATION = 'koweb.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-import os
+# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 USE_MYSQL = os.environ.get('USE_MYSQL', 'False') == 'True'
 
