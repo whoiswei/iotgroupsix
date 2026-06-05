@@ -41,6 +41,7 @@ else:
         'https://*.trycloudflare.com',
         'https://*.ngrok.io',
         'https://*.ngrok-free.app',
+        'https://*.ngrok-free.dev',
         'https://*.loca.lt',
     ]
 
