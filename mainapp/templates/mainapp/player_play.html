@@ -3,23 +3,37 @@
 <div style="text-align: center;">
     <h1 style="color: var(--neon-pink);">{{ project.title }}</h1>
     
-    <div class="pixel-border" style="border-color: var(--neon-blue); max-width: 600px; margin: 0 auto; text-align: left;">
-        <h2 style="color: var(--neon-blue); text-align: center;">遊戲狀態</h2>
+    <div class="pixel-border" style="border-color: var(--neon-blue); max-width: 600px; margin: 0 auto; text-align: left; background: #0c0c20;">
+        <h2 style="color: var(--neon-blue); text-align: center; margin-top: 0;">遊戲狀態 STATUS</h2>
         
-        <div style="display: flex; justify-content: space-around; margin: 20px 0;">
+        <!-- 顯示專案背景圖 -->
+        {% if project.story_image %}
+            <div id="project-image-container" style="text-align: center; margin-bottom: 20px;">
+                <img src="{{ project.story_image.url }}" style="max-width: 100%; max-height: 220px; border: 2px solid var(--primary-blue); border-radius: 4px;">
+            </div>
+        {% endif %}
+
+        <div style="display: flex; justify-content: space-around; margin: 20px 0; background: #050515; padding: 15px 0; border: 1px dashed var(--primary-blue);">
             <div style="text-align: center;">
-                <p style="color: var(--neon-yellow); margin-bottom: 5px;">倒數計時 TIMER</p>
-                <div style="font-size: 2rem; color: var(--neon-yellow);" id="timer">-- : --</div>
+                <p style="color: var(--neon-yellow); margin-bottom: 5px; font-size: 0.9rem;">倒數計時 TIMER</p>
+                <div style="font-size: 2rem; color: var(--neon-yellow); font-family: monospace;" id="timer">-- : --</div>
             </div>
             <div style="text-align: center;">
-                <p style="color: var(--neon-pink); margin-bottom: 5px;">錯誤次數 ERRORS</p>
-                <div style="font-size: 2rem; color: var(--neon-pink);" id="errors">0</div>
+                <p style="color: var(--neon-pink); margin-bottom: 5px; font-size: 0.9rem;">錯誤次數 ERRORS</p>
+                <div style="font-size: 2rem; color: var(--neon-pink); font-family: monospace;">
+                    <span id="errors">0</span> / <span id="max-errors">{{ project.max_errors }}</span>
+                </div>
             </div>
         </div>
 
         <div style="border-top: 2px dashed var(--primary-blue); padding-top: 20px; margin-top: 20px;">
-            <h3 style="color: var(--neon-blue);">故事介面 STORY :</h3>
-            <p id="story-text" style="font-size: 1.2rem; line-height: 1.5;">{{ project.story_intro }}</p>
+            <h3 style="color: var(--neon-blue); margin-top: 0;">故事介面 STORY :</h3>
+            <p id="story-text" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px;">{{ project.story_intro }}</p>
+            
+            <!-- 顯示關卡引導圖片 -->
+            <div id="module-image-container" style="display: none; text-align: center; margin-top: 15px; padding: 10px; background: #050510; border: 1px solid #202050;">
+                <img id="module-image" src="" style="max-width: 100%; max-height: 200px; border: 2px solid var(--neon-pink); border-radius: 4px;">
+            </div>
         </div>
         
         <div style="text-align: center; margin-top: 30px;">
@@ -30,67 +44,88 @@
 </div>
 
 <script>
-    // Module configuration payload from Django to send to Raspberry Pi via MQTT
-    const projectConfig = [
-        {% for mod in project.modules.all %}
-        {
-            module_type: {{ mod.module_type }},
-            time_limit: {{ mod.time_limit }},
-            story: `{{ mod.story_text|escapejs }}`,
-            config: JSON.parse(`{{ mod.config_data|default:'{}'|escapejs }}`)
-        }{% if not forloop.last %},{% endif %}
-        {% endfor %}
-    ];
+    // Safe parse project config passed from python view
+    const projectConfig = {{ play_modules_json|default:'[]'|safe }};
+    const maxErrorsAllowed = {{ project.max_errors|default:3 }};
 
     const startBtn = document.getElementById('start-btn');
     const endBtn = document.getElementById('end-btn');
     const timerDisplay = document.getElementById('timer');
     const errorsDisplay = document.getElementById('errors');
     const storyTextDisplay = document.getElementById('story-text');
+    const projectImageContainer = document.getElementById('project-image-container');
+    const moduleImageContainer = document.getElementById('module-image-container');
+    const moduleImage = document.getElementById('module-image');
 
     let currentModuleIndex = 0;
     let timerInterval = null;
     let timeRemaining = 0;
     let errors = 0;
+    let gameActive = false;
 
     startBtn.addEventListener('click', () => {
-        // Mocking MQTT Connection and sending config
+        if (projectConfig.length === 0) {
+            storyTextDisplay.textContent = "此專案沒有任何解謎關卡！";
+            return;
+        }
+
         console.log("Publishing project config to MQTT topic 'iot_escape/project/start'...");
         console.log(JSON.stringify(projectConfig));
         
+        gameActive = true;
+        errors = 0;
+        errorsDisplay.textContent = "0";
+        
         startBtn.style.display = 'none';
         endBtn.style.display = 'inline-block';
-        
-        if (projectConfig.length > 0) {
-            loadModule(0);
-        } else {
-            storyTextDisplay.textContent = "此專案沒有任何模組！";
+        if (projectImageContainer) {
+            projectImageContainer.style.display = 'none'; // 開始後隱藏專案大圖，留空間給關卡圖
         }
+        
+        loadModule(0);
     });
 
     endBtn.addEventListener('click', () => {
+        resetGame("遊戲已結束。");
+    });
+
+    function resetGame(statusText) {
+        gameActive = false;
         clearInterval(timerInterval);
         startBtn.style.display = 'inline-block';
         endBtn.style.display = 'none';
         timerDisplay.textContent = "-- : --";
-        storyTextDisplay.textContent = "遊戲已結束。";
-        errorsDisplay.textContent = "0";
-        errors = 0;
-    });
+        storyTextDisplay.textContent = statusText;
+        moduleImageContainer.style.display = 'none';
+        moduleImage.src = '';
+        if (projectImageContainer) {
+            projectImageContainer.style.display = 'block';
+        }
+    }
 
     function loadModule(index) {
         if (index >= projectConfig.length) {
-            storyTextDisplay.textContent = "🎉 恭喜通關所有模組！遊戲結束。";
+            storyTextDisplay.innerHTML = "🎉 恭喜通關所有模組！遊戲結束。";
             clearInterval(timerInterval);
             timerDisplay.textContent = "00 : 00";
+            moduleImageContainer.style.display = 'none';
             return;
         }
 
         currentModuleIndex = index;
         const mod = projectConfig[index];
-        storyTextDisplay.innerHTML = `<span style="color:var(--neon-pink)">[關卡 ${index + 1}]</span><br>` + mod.story;
-        timeRemaining = mod.time_limit;
+        storyTextDisplay.innerHTML = `<span style="color:var(--neon-pink); font-weight:bold;">[關卡 ${index + 1} - ${getModuleName(mod.module_type)}]</span><br>${mod.story}`;
         
+        // 載入關卡圖片
+        if (mod.image_url) {
+            moduleImage.src = mod.image_url;
+            moduleImageContainer.style.display = 'block';
+        } else {
+            moduleImageContainer.style.display = 'none';
+            moduleImage.src = '';
+        }
+
+        timeRemaining = mod.time_limit;
         clearInterval(timerInterval);
         updateTimerDisplay();
         
@@ -99,14 +134,10 @@
             updateTimerDisplay();
             if (timeRemaining <= 0) {
                 clearInterval(timerInterval);
-                storyTextDisplay.innerHTML += "<br><span style="color:red">時間到！炸彈引爆！</span>";
+                storyTextDisplay.innerHTML += "<br><span style='color:red; font-weight:bold;'>⏳ 時間到！炸彈已引爆！</span>";
+                setTimeout(() => resetGame("任務失敗！時間超限。"), 2000);
             }
         }, 1000);
-
-        // Simulation: Automatically go to next module after 10s for testing
-        // setTimeout(() => {
-        //     loadModule(index + 1);
-        // }, 10000);
     }
 
     function updateTimerDisplay() {
@@ -115,17 +146,42 @@
         timerDisplay.textContent = `${mins} : ${secs}`;
     }
 
+    function getModuleName(type) {
+        const names = {
+            1: '方向指令模組',
+            2: '指定高度模組',
+            3: '調頻模組',
+            4: 'RGB模組',
+            5: '摩斯密碼模組',
+            6: '旋鈕模組',
+            7: '密碼模組',
+            8: '拆線模組',
+            9: '符號指撥開關模組'
+        };
+        return names[type] || '未知模組';
+    }
+
     // Mock receiving MQTT messages from hardware
     function mockReceiveMqttMessage(topic, payload) {
+        if (!gameActive) return;
+
         if (topic === 'iot_escape/status/error') {
             errors++;
             errorsDisplay.textContent = errors;
+            
+            if (errors >= maxErrorsAllowed) {
+                clearInterval(timerInterval);
+                storyTextDisplay.innerHTML += `<br><span style="color:red; font-weight:bold;">💥 錯誤達上限 (${maxErrorsAllowed}次)！炸彈引爆！</span>`;
+                setTimeout(() => resetGame("任務失敗！錯誤次數達上限。"), 2000);
+            } else {
+                storyTextDisplay.innerHTML += `<br><span style="color:var(--neon-pink)">⚠️ 錯誤觸發！目前累計 ${errors} 次錯誤。</span>`;
+            }
         } else if (topic === 'iot_escape/status/module_passed') {
             loadModule(currentModuleIndex + 1);
         }
     }
 
-    // Expose mock function for manual testing in browser console
+    // Expose mock functions for manual testing in browser console
     window.triggerError = () => mockReceiveMqttMessage('iot_escape/status/error', {});
     window.triggerPass = () => mockReceiveMqttMessage('iot_escape/status/module_passed', {});
 </script>

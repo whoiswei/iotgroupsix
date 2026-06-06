@@ -3,7 +3,7 @@
 <div>
     <h1 style="color: var(--neon-pink);">{% if project %}編輯專案{% else %}新增專案{% endif %}</h1>
     
-    <form method="post" id="project-form">
+    <form method="post" id="project-form" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="modules_data" id="modules_data" value="[]">
         
@@ -12,9 +12,27 @@
                 <label>專案名稱 TITLE :</label>
                 <input type="text" name="title" class="pixel-input" required value="{{ project.title|default_if_none:'' }}">
             </div>
+            
+            <div class="grid" style="grid-template-columns: 2fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>故事前言 STORY :</label>
+                    <textarea name="story_intro" class="pixel-textarea" rows="4">{{ project.story_intro|default_if_none:'' }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>容許最大錯誤次數 MAX ERRORS :</label>
+                    <input type="number" name="max_errors" class="pixel-input" min="1" max="20" required value="{{ project.max_errors|default:3 }}">
+                </div>
+            </div>
+
             <div class="form-group">
-                <label>故事前言 STORY :</label>
-                <textarea name="story_intro" class="pixel-textarea" rows="4">{{ project.story_intro|default_if_none:'' }}</textarea>
+                <label>故事前言圖片 STORY IMAGE :</label>
+                {% if project.story_image %}
+                    <div style="margin-bottom: 10px;">
+                        <img src="{{ project.story_image.url }}" alt="Story Image" style="max-height: 150px; border: 2px solid var(--primary-blue); border-radius: 4px; display: block;">
+                        <span style="font-size: 0.8rem; color: var(--neon-pink);">已有上傳圖片，重新選擇檔案將會替換。</span>
+                    </div>
+                {% endif %}
+                <input type="file" name="story_image" class="pixel-input" accept="image/*">
             </div>
         </div>
 
@@ -40,19 +58,22 @@
 </div>
 
 <script>
-    let modules = [];
-    // Pre-populate if editing
-    {% if project %}
-        {% for mod in project.modules.all %}
-            modules.push({
-                module_type: {{ mod.module_type }},
-                module_name: "{{ mod.get_module_type_display }}",
-                time_limit: {{ mod.time_limit }},
-                story_text: `{{ mod.story_text|escapejs }}`,
-                config_data: JSON.parse(`{{ mod.config_data|default:'{}'|escapejs }}`)
-            });
-        {% endfor %}
-    {% endif %}
+    // Safe JSON parse from Django view (will never throw single-quote syntax errors)
+    let modules = {{ modules_json|default:'[]'|safe }};
+
+    // Morse Code mapping for auto translation
+    const morseMap = {
+        'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....',
+        'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.',
+        'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+        'Y': '-.--', 'Z': '--..',
+        '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....',
+        '6': '-....', '7': '--...', '8': '---..', '9': '----.', '0': '-----'
+    };
+
+    function translateWordToMorse(word) {
+        return word.toUpperCase().split('').map(char => morseMap[char] || '').filter(code => code !== '').join(' ');
+    }
 
     const container = document.getElementById('modules-container');
     const moduleSelector = document.getElementById('module-selector');
@@ -63,34 +84,152 @@
         container.innerHTML = '';
         modules.forEach((mod, index) => {
             const modDiv = document.createElement('div');
-            modDiv.className = 'module-card';
+            modDiv.className = 'module-card pixel-border';
+            modDiv.style.borderColor = 'var(--primary-blue)';
+            modDiv.style.marginBottom = '20px';
+            modDiv.style.padding = '15px';
+            modDiv.style.background = '#0a0a1a';
+            
+            // Generate visual config editor html based on module type
+            let configHtml = '';
+            const type = mod.module_type;
+            const config = mod.config_data || {};
+
+            switch(type) {
+                case 1: // 方向指令模組
+                    const seq = config.sequence || [];
+                    configHtml = `
+                        <label>方向指令順序 (點擊按鈕依序加入)：</label>
+                        <div style="margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'UP')">↑ 上 (UP)</button>
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'DOWN')">↓ 下 (DOWN)</button>
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'LEFT')">← 左 (LEFT)</button>
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'RIGHT')">→ 右 (RIGHT)</button>
+                            <button type="button" class="pixel-btn pink" style="padding: 5px 10px;" onclick="clearDirections(${index})">清除</button>
+                        </div>
+                        <input type="text" class="pixel-input" readonly value="${seq.length > 0 ? seq.join(' ➔ ') : '尚未設定方向'}" style="background: #050510; border-color: var(--neon-pink);">
+                    `;
+                    break;
+                case 2: // 指定高度模組
+                    configHtml = `
+                        <label>目標高度 (cm 或數值)：</label>
+                        <input type="number" class="pixel-input config-val-input" data-key="target_height" data-index="${index}" value="${config.target_height || ''}" placeholder="例如: 150">
+                    `;
+                    break;
+                case 3: // 調頻模組
+                    configHtml = `
+                        <label>目標頻率 (MHz 或數值)：</label>
+                        <input type="number" step="0.1" class="pixel-input config-val-input" data-key="target_frequency" data-index="${index}" value="${config.target_frequency || ''}" placeholder="例如: 98.7">
+                    `;
+                    break;
+                case 4: // RGB模組
+                    const colorSeq = config.color_sequence || [];
+                    configHtml = `
+                        <label>RGB 顏色順序 (點擊按鈕依序加入)：</label>
+                        <div style="margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #ff0055;" onclick="addRGB(${index}, 'RED')">紅色 (R)</button>
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #00ff55; color: black;" onclick="addRGB(${index}, 'GREEN')">綠色 (G)</button>
+                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #0055ff;" onclick="addRGB(${index}, 'BLUE')">藍色 (B)</button>
+                            <button type="button" class="pixel-btn pink" style="padding: 5px 10px;" onclick="clearRGB(${index})">清除</button>
+                        </div>
+                        <input type="text" class="pixel-input" readonly value="${colorSeq.length > 0 ? colorSeq.join(' ➔ ') : '尚未設定顏色'}" style="background: #050510; border-color: var(--neon-blue);">
+                    `;
+                    break;
+                case 5: // 摩斯密碼模組
+                    configHtml = `
+                        <div class="grid" style="gap: 15px;">
+                            <div>
+                                <label>解答單字 (英文)：</label>
+                                <input type="text" class="pixel-input morse-word-input" data-index="${index}" value="${config.word || ''}" placeholder="例如: SOS" oninput="updateMorse(${index}, this.value)">
+                            </div>
+                            <div>
+                                <label>摩斯密碼 (自動生成)：</label>
+                                <input type="text" class="pixel-input config-val-input" data-key="morse" data-index="${index}" id="morse-input-${index}" value="${config.morse || ''}" placeholder="例如: ... --- ...">
+                            </div>
+                        </div>
+                    `;
+                    break;
+                case 6: // 旋鈕模組
+                    configHtml = `
+                        <label>目標旋鈕設定數值 (0 ~ 100)：</label>
+                        <input type="number" min="0" max="100" class="pixel-input config-val-input" data-key="target_value" data-index="${index}" value="${config.target_value || ''}" placeholder="例如: 75">
+                    `;
+                    break;
+                case 7: // 密碼模組
+                    configHtml = `
+                        <label>數字密碼解答：</label>
+                        <input type="text" class="pixel-input config-val-input" data-key="password" data-index="${index}" value="${config.password || ''}" placeholder="例如: 1234">
+                    `;
+                    break;
+                case 8: // 拆線模組
+                    const currentWire = config.wire_to_cut || 'RED';
+                    configHtml = `
+                        <label>設定目標要剪斷的電線顏色：</label>
+                        <select class="pixel-select config-select-input" data-key="wire_to_cut" data-index="${index}">
+                            <option value="RED" ${currentWire === 'RED' ? 'selected' : ''}>紅線 (RED)</option>
+                            <option value="BLUE" ${currentWire === 'BLUE' ? 'selected' : ''}>藍線 (BLUE)</option>
+                            <option value="YELLOW" ${currentWire === 'YELLOW' ? 'selected' : ''}>黃線 (YELLOW)</option>
+                            <option value="GREEN" ${currentWire === 'GREEN' ? 'selected' : ''}>綠線 (GREEN)</option>
+                        </select>
+                    `;
+                    break;
+                case 9: // 符號指撥開關模組
+                    const switches = config.switch_states || [0, 0, 0, 0];
+                    configHtml = `
+                        <label>開關正確設定狀態 (勾選代表該開關要設定為 ON)：</label>
+                        <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
+                            ${[1, 2, 3, 4].map((num, i) => `
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--neon-yellow);">
+                                    <input type="checkbox" class="switch-checkbox" data-index="${index}" data-switch-idx="${i}" ${switches[i] === 1 ? 'checked' : ''} onchange="updateSwitch(${index}, ${i}, this.checked)" style="transform: scale(1.3); cursor: pointer;">
+                                    開關 ${num} (SW${num})
+                                </label>
+                            `).join('')}
+                        </div>
+                    `;
+                    break;
+                default:
+                    configHtml = `
+                        <label>答案/設定 JSON (Config)：</label>
+                        <input type="text" class="pixel-input config-val-input-raw" value='${JSON.stringify(config)}' data-index="${index}">
+                    `;
+            }
+
             modDiv.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--primary-blue); padding-bottom: 10px; margin-bottom: 10px;">
-                    <h3 style="color: var(--neon-pink); margin: 0;">${index + 1}. ${mod.module_name}</h3>
-                    <button type="button" class="pixel-btn pink" style="padding: 5px; font-size: 0.8rem; margin: 0;" onclick="removeModule(${index})">刪除</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--primary-blue); padding-bottom: 8px; margin-bottom: 15px;">
+                    <h3 style="color: var(--neon-pink); margin: 0;">#${index + 1} - ${mod.module_name}</h3>
+                    <button type="button" class="pixel-btn pink" style="padding: 5px 12px; font-size: 0.8rem; margin: 0;" onclick="removeModule(${index})">刪除關卡</button>
                 </div>
-                <div class="grid">
+                <div class="grid" style="grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 15px;">
                     <div class="form-group">
-                        <label>時間限制 Time (秒):</label>
+                        <label>限制秒數 Time (秒)：</label>
                         <input type="number" class="pixel-input time-input" value="${mod.time_limit}" data-index="${index}" min="10">
                     </div>
                     <div class="form-group">
-                        <label>故事引導 Story Text:</label>
-                        <textarea class="pixel-textarea story-input" data-index="${index}" rows="2">${mod.story_text || ''}</textarea>
+                        <label>關卡故事引導 Story Text：</label>
+                        <textarea class="pixel-textarea story-input" data-index="${index}" rows="2" placeholder="請輸入本關卡的提示或劇情故事...">${mod.story_text || ''}</textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>答案/設定 JSON (Config):</label>
-                    <input type="text" class="pixel-input config-input" value='${JSON.stringify(mod.config_data)}' data-index="${index}" placeholder='{"answer": "A"}'>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>關卡引導圖片 LEVEL IMAGE :</label>
+                    ${mod.image_url ? `
+                        <div style="margin-bottom: 8px;">
+                            <img src="${mod.image_url}" style="max-height: 80px; border: 1px solid var(--primary-blue); display: block; margin-bottom: 4px;">
+                            <span style="font-size: 0.8rem; color: var(--neon-pink);">已有上傳關卡圖片，重新選擇檔案將會替換。</span>
+                        </div>
+                    ` : ''}
+                    <input type="file" name="module_image_${index}" class="pixel-input" accept="image/*">
+                </div>
+                <div class="form-group" style="background: #050515; padding: 12px; border-radius: 4px; border: 1px solid #151535;">
+                    ${configHtml}
                 </div>
             `;
             container.appendChild(modDiv);
         });
         
-        // Add listeners
+        // Register events for inputs inside rendered modules
         document.querySelectorAll('.time-input').forEach(input => {
             input.addEventListener('change', (e) => {
-                modules[e.target.dataset.index].time_limit = parseInt(e.target.value);
+                modules[e.target.dataset.index].time_limit = parseInt(e.target.value) || 60;
             });
         });
         document.querySelectorAll('.story-input').forEach(input => {
@@ -98,15 +237,68 @@
                 modules[e.target.dataset.index].story_text = e.target.value;
             });
         });
-        document.querySelectorAll('.config-input').forEach(input => {
+        document.querySelectorAll('.config-val-input').forEach(input => {
             input.addEventListener('change', (e) => {
-                try {
-                    modules[e.target.dataset.index].config_data = JSON.parse(e.target.value);
-                } catch(err) {
-                    alert('無效的 JSON 格式！');
-                }
+                const idx = e.target.dataset.index;
+                const key = e.target.dataset.key;
+                if(!modules[idx].config_data) modules[idx].config_data = {};
+                modules[idx].config_data[key] = e.target.value;
             });
         });
+        document.querySelectorAll('.config-select-input').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const idx = e.target.dataset.index;
+                const key = e.target.dataset.key;
+                if(!modules[idx].config_data) modules[idx].config_data = {};
+                modules[idx].config_data[key] = e.target.value;
+            });
+        });
+    }
+
+    // Direction Module Utilities
+    window.addDirection = function(index, dir) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.sequence) modules[index].config_data.sequence = [];
+        modules[index].config_data.sequence.push(dir);
+        renderModules();
+    }
+    window.clearDirections = function(index) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        modules[index].config_data.sequence = [];
+        renderModules();
+    }
+
+    // RGB Module Utilities
+    window.addRGB = function(index, color) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.color_sequence) modules[index].config_data.color_sequence = [];
+        modules[index].config_data.color_sequence.push(color);
+        renderModules();
+    }
+    window.clearRGB = function(index) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        modules[index].config_data.color_sequence = [];
+        renderModules();
+    }
+
+    // Morse Module Utilities
+    window.updateMorse = function(index, value) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        modules[index].config_data.word = value;
+        const translated = translateWordToMorse(value);
+        modules[index].config_data.morse = translated;
+        
+        const morseInput = document.getElementById(`morse-input-${index}`);
+        if(morseInput) {
+            morseInput.value = translated;
+        }
+    }
+
+    // Switch Module Utilities
+    window.updateSwitch = function(index, swIdx, checked) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.switch_states) modules[index].config_data.switch_states = [0, 0, 0, 0];
+        modules[index].config_data.switch_states[swIdx] = checked ? 1 : 0;
     }
 
     window.removeModule = function(index) {
@@ -117,12 +309,23 @@
     document.getElementById('add-module-btn').addEventListener('click', () => {
         const type = parseInt(moduleSelector.value);
         const name = moduleSelector.options[moduleSelector.selectedIndex].text;
+        
+        // Define default configs for easy UI binding
+        let defaultConfig = {};
+        switch(type) {
+            case 1: defaultConfig = { sequence: [] }; break;
+            case 4: defaultConfig = { color_sequence: [] }; break;
+            case 5: defaultConfig = { word: '', morse: '' }; break;
+            case 8: defaultConfig = { wire_to_cut: 'RED' }; break;
+            case 9: defaultConfig = { switch_states: [0, 0, 0, 0] }; break;
+        }
+
         modules.push({
             module_type: type,
             module_name: name,
             time_limit: 60,
             story_text: '',
-            config_data: {}
+            config_data: defaultConfig
         });
         renderModules();
     });
@@ -131,6 +334,7 @@
         modulesDataInput.value = JSON.stringify(modules);
     });
 
+    // Initial render
     renderModules();
 </script>
 {% endblock %}

@@ -55,33 +55,94 @@ def creator_form(request, project_id=None):
     if request.method == 'POST':
         title = request.POST.get('title')
         story_intro = request.POST.get('story_intro')
-        
+        max_errors_str = request.POST.get('max_errors', '3')
+        try:
+            max_errors = int(max_errors_str)
+        except ValueError:
+            max_errors = 3
+
         if not project:
-            project = Project.objects.create(creator=request.user, title=title, story_intro=story_intro)
+            project = Project.objects.create(
+                creator=request.user, 
+                title=title, 
+                story_intro=story_intro,
+                max_errors=max_errors
+            )
         else:
             project.title = title
             project.story_intro = story_intro
+            project.max_errors = max_errors
             project.save()
             
+        # Handle Project Image upload
+        if 'story_image' in request.FILES:
+            project.story_image = request.FILES['story_image']
+            project.save()
+
         modules_data = request.POST.get('modules_data', '[]')
         try:
             modules = json.loads(modules_data)
-            project.modules.all().delete()
+            submitted_ids = []
             for idx, mod in enumerate(modules):
-                ProjectModule.objects.create(
-                    project=project,
-                    module_type=mod['module_type'],
-                    order=idx,
-                    time_limit=mod.get('time_limit', 60),
-                    story_text=mod.get('story_text', ''),
-                    config_data=mod.get('config_data', {})
-                )
+                mod_id = mod.get('id')
+                module_obj = None
+                if mod_id:
+                    try:
+                        module_obj = ProjectModule.objects.get(id=mod_id, project=project)
+                        module_obj.module_type = mod['module_type']
+                        module_obj.order = idx
+                        module_obj.time_limit = mod.get('time_limit', 60)
+                        module_obj.story_text = mod.get('story_text', '')
+                        module_obj.config_data = mod.get('config_data', {})
+                        module_obj.save()
+                    except ProjectModule.DoesNotExist:
+                        pass
+                
+                if not module_obj:
+                    module_obj = ProjectModule.objects.create(
+                        project=project,
+                        module_type=mod['module_type'],
+                        order=idx,
+                        time_limit=mod.get('time_limit', 60),
+                        story_text=mod.get('story_text', ''),
+                        config_data=mod.get('config_data', {})
+                    )
+                
+                # Check for dynamic file input for this module
+                file_key = f'module_image_{idx}'
+                if file_key in request.FILES:
+                    module_obj.story_image = request.FILES[file_key]
+                    module_obj.save()
+                
+                submitted_ids.append(module_obj.id)
+                
+            # Delete any modules that were removed in the UI
+            project.modules.exclude(id__in=submitted_ids).delete()
         except Exception as e:
             pass
             
         return redirect('creator_list')
+
+    # Serialize modules list to JSON string for the template
+    modules_list = []
+    if project:
+        for mod in project.modules.all():
+            modules_list.append({
+                'id': mod.id,
+                'module_type': mod.module_type,
+                'module_name': mod.get_module_type_display(),
+                'time_limit': mod.time_limit,
+                'story_text': mod.story_text or '',
+                'config_data': mod.config_data or {},
+                'image_url': mod.story_image.url if mod.story_image else ''
+            })
+    modules_json = json.dumps(modules_list)
         
-    return render(request, 'mainapp/creator_form.html', {'project': project, 'module_choices': ProjectModule.MODULE_CHOICES})
+    return render(request, 'mainapp/creator_form.html', {
+        'project': project, 
+        'module_choices': ProjectModule.MODULE_CHOICES,
+        'modules_json': modules_json
+    })
 
 @login_required
 def creator_delete(request, project_id):
@@ -93,10 +154,23 @@ def creator_delete(request, project_id):
 
 @login_required
 def player_list(request):
-    projects = Project.objects.all()
-    return render(request, 'mainapp/player_list.html', {'projects': projects})
+      projects = Project.objects.all()
+      return render(request, 'mainapp/player_list.html', {'projects': projects})
 
 @login_required
 def player_play(request, project_id):
-    project = get_object_or_404(Project, id=project_id)
-    return render(request, 'mainapp/player_play.html', {'project': project})
+      project = get_object_or_404(Project, id=project_id)
+      modules_list = []
+      for mod in project.modules.all():
+          modules_list.append({
+              'module_type': mod.module_type,
+              'time_limit': mod.time_limit,
+              'story': mod.story_text or '',
+              'image_url': mod.story_image.url if mod.story_image else '',
+              'config': mod.config_data or {}
+          })
+      modules_json = json.dumps(modules_list)
+      return render(request, 'mainapp/player_play.html', {
+          'project': project,
+          'play_modules_json': modules_json
+      })

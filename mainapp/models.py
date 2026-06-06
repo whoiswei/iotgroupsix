@@ -5,6 +5,8 @@ class Project(models.Model):
     creator = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
     title = models.CharField(max_length=100)
     story_intro = models.TextField(blank=True, null=True)
+    story_image = models.ImageField(upload_to='project_images/', blank=True, null=True)
+    max_errors = models.PositiveIntegerField(default=3, help_text="Maximum allowed errors before game over")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -28,6 +30,7 @@ class ProjectModule(models.Model):
     order = models.PositiveIntegerField(default=0)
     time_limit = models.PositiveIntegerField(default=60, help_text="Time limit in seconds")
     story_text = models.TextField(blank=True, null=True, help_text="Story context for this module")
+    story_image = models.ImageField(upload_to='module_images/', blank=True, null=True)
     config_data = models.JSONField(default=dict, blank=True, help_text="JSON data containing the answers/config for the module")
 
     class Meta:
