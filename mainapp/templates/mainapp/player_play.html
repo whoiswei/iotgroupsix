@@ -125,7 +125,7 @@
         startBtn.style.display = 'inline-block';
         endBtn.style.display = 'none';
         timerDisplay.textContent = "-- : --";
-        globalTimerDisplay.textContent = "-- : --";
+        initGlobalTimer();
         storyTextDisplay.textContent = statusText;
         moduleImageContainer.style.display = 'none';
         moduleImageContainer.innerHTML = '';
@@ -224,5 +224,13 @@
     // Expose mock functions for manual testing in browser console
     window.triggerError = () => mockReceiveMqttMessage('iot_escape/status/error', {});
     window.triggerPass = () => mockReceiveMqttMessage('iot_escape/status/module_passed', {});
+
+    // Initialize global timer display with project's time limit before start
+    function initGlobalTimer() {
+        const mins = Math.floor(globalTimeLimit / 60).toString().padStart(2, '0');
+        const secs = (globalTimeLimit % 60).toString().padStart(2, '0');
+        globalTimerDisplay.textContent = `${mins} : ${secs}`;
+    }
+    initGlobalTimer();
 </script>
 {% endblock %}
