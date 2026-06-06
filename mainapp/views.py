@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from .models import Project, ProjectModule
+from .models import Project, ProjectModule, ProjectImage, ProjectModuleImage
 import json
 
 def home(request):
@@ -74,10 +74,12 @@ def creator_form(request, project_id=None):
             project.max_errors = max_errors
             project.save()
             
-        # Handle Project Image upload
-        if 'story_image' in request.FILES:
-            project.story_image = request.FILES['story_image']
-            project.save()
+        # Handle Project Images upload (multiple)
+        if 'project_images' in request.FILES:
+            # If new images are uploaded, delete old ones
+            project.images.all().delete()
+            for img in request.FILES.getlist('project_images'):
+                ProjectImage.objects.create(project=project, image=img)
 
         modules_data = request.POST.get('modules_data', '[]')
         try:
@@ -108,11 +110,12 @@ def creator_form(request, project_id=None):
                         config_data=mod.get('config_data', {})
                     )
                 
-                # Check for dynamic file input for this module
-                file_key = f'module_image_{idx}'
+                # Check for multiple file input for this module
+                file_key = f'module_images_{idx}'
                 if file_key in request.FILES:
-                    module_obj.story_image = request.FILES[file_key]
-                    module_obj.save()
+                    module_obj.images.all().delete()
+                    for img in request.FILES.getlist(file_key):
+                        ProjectModuleImage.objects.create(module=module_obj, image=img)
                 
                 submitted_ids.append(module_obj.id)
                 
@@ -127,6 +130,11 @@ def creator_form(request, project_id=None):
     modules_list = []
     if project:
         for mod in project.modules.all():
+            image_urls = [img.image.url for img in mod.images.all()]
+            # Fallback to legacy single image if exists and no multiple images
+            if not image_urls and mod.story_image:
+                image_urls = [mod.story_image.url]
+                
             modules_list.append({
                 'id': mod.id,
                 'module_type': mod.module_type,
@@ -134,12 +142,19 @@ def creator_form(request, project_id=None):
                 'time_limit': mod.time_limit,
                 'story_text': mod.story_text or '',
                 'config_data': mod.config_data or {},
-                'image_url': mod.story_image.url if mod.story_image else ''
+                'image_urls': image_urls
             })
     modules_json = json.dumps(modules_list)
+    
+    project_image_urls = []
+    if project:
+        project_image_urls = [img.image.url for img in project.images.all()]
+        if not project_image_urls and project.story_image:
+            project_image_urls = [project.story_image.url]
         
     return render(request, 'mainapp/creator_form.html', {
         'project': project, 
+        'project_image_urls': json.dumps(project_image_urls),
         'module_choices': ProjectModule.MODULE_CHOICES,
         'modules_json': modules_json
     })

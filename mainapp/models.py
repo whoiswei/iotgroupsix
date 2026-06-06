@@ -38,3 +38,13 @@ class ProjectModule(models.Model):
 
     def __str__(self):
         return f"{self.project.title} - Module {self.get_module_type_display()} ({self.order})"
+
+class ProjectImage(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='project_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class ProjectModuleImage(models.Model):
+    module = models.ForeignKey(ProjectModule, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='module_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)

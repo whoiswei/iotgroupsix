@@ -1,5 +1,8 @@
 {% extends 'mainapp/base.html' %}
 {% block content %}
+<style>
+    .svg-14seg polygon, .svg-14seg line { transition: fill 0.2s, stroke 0.2s; }
+</style>
 <div>
     <h1 style="color: var(--neon-pink);">{% if project %}編輯專案{% else %}新增專案{% endif %}</h1>
     
@@ -25,14 +28,12 @@
             </div>
 
             <div class="form-group">
-                <label>故事前言圖片 STORY IMAGE :</label>
-                {% if project.story_image %}
-                    <div style="margin-bottom: 10px;">
-                        <img src="{{ project.story_image.url }}" alt="Story Image" style="max-height: 150px; border: 2px solid var(--primary-blue); border-radius: 4px; display: block;">
-                        <span style="font-size: 0.8rem; color: var(--neon-pink);">已有上傳圖片，重新選擇檔案將會替換。</span>
-                    </div>
-                {% endif %}
-                <input type="file" name="story_image" class="pixel-input" accept="image/*">
+                <label>故事前言圖片 STORY IMAGES (可多選) :</label>
+                <div id="project-image-preview" style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+                    <!-- Previews injected by JS -->
+                </div>
+                <input type="file" name="project_images" class="pixel-input" accept="image/*" multiple onchange="previewImages(this, 'project-image-preview')">
+                <span style="font-size: 0.8rem; color: var(--neon-pink);">選擇新圖片將會替換掉原本的所有圖片。</span>
             </div>
         </div>
 
@@ -58,10 +59,44 @@
 </div>
 
 <script>
-    // Safe JSON parse from Django view (will never throw single-quote syntax errors)
+    // Safe JSON parses
     let modules = {{ modules_json|default:'[]'|safe }};
+    let initialProjectImages = {{ project_image_urls|default:'[]'|safe }};
+    
+    function renderProjectImagePreviews() {
+        const previewDiv = document.getElementById('project-image-preview');
+        previewDiv.innerHTML = '';
+        initialProjectImages.forEach(url => {
+            previewDiv.innerHTML += `<img src="${url}" style="max-height: 100px; border: 2px solid var(--primary-blue); border-radius: 4px;">`;
+        });
+    }
+    renderProjectImagePreviews();
 
-    // Morse Code mapping for auto translation
+    window.previewImages = function(input, previewId) {
+        const previewDiv = document.getElementById(previewId);
+        previewDiv.innerHTML = '';
+        if (input.files) {
+            Array.from(input.files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewDiv.innerHTML += `<img src="${e.target.result}" style="max-height: 100px; border: 2px solid var(--neon-pink); border-radius: 4px;">`;
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+    }
+
+    const rgbColors = [
+        {val: 'RED', hex: '#ff0000', name: '紅'},
+        {val: 'ORANGE', hex: '#ff8800', name: '橙'},
+        {val: 'YELLOW', hex: '#ffff00', name: '黃'},
+        {val: 'GREEN', hex: '#00ff00', name: '綠'},
+        {val: 'BLUE', hex: '#0000ff', name: '藍'},
+        {val: 'INDIGO', hex: '#4b0082', name: '靛'},
+        {val: 'PURPLE', hex: '#8a2be2', name: '紫'},
+        {val: 'WHITE', hex: '#ffffff', name: '白'}
+    ];
+
     const morseMap = {
         'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....',
         'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.',
@@ -90,7 +125,6 @@
             modDiv.style.padding = '15px';
             modDiv.style.background = '#0a0a1a';
             
-            // Generate visual config editor html based on module type
             let configHtml = '';
             const type = mod.module_type;
             const config = mod.config_data || {};
@@ -110,31 +144,51 @@
                         <input type="text" class="pixel-input" readonly value="${seq.length > 0 ? seq.join(' ➔ ') : '尚未設定方向'}" style="background: #050510; border-color: var(--neon-pink);">
                     `;
                     break;
+
                 case 2: // 指定高度模組
+                    const heights = config.heights || [1, 1, 1, 1, 1];
                     configHtml = `
-                        <label>目標高度 (cm 或數值)：</label>
-                        <input type="number" class="pixel-input config-val-input" data-key="target_height" data-index="${index}" value="${config.target_height || ''}" placeholder="例如: 150">
+                        <label>設定每個 LED 排燈的高度 (1 ~ 10)：</label>
+                        <div style="display: flex; gap: 30px; margin-top: 15px; padding: 10px; background: #000; border-radius: 8px;">
+                            ${[0, 1, 2, 3, 4].map(i => `
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                    <span id="height-val-${index}-${i}" style="color: var(--neon-yellow); font-weight: bold; font-size: 1.2rem;">${heights[i]}</span>
+                                    <input type="range" min="1" max="10" step="1" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical; height: 120px; cursor: pointer;" value="${heights[i]}" oninput="updateHeight(${index}, ${i}, this.value)">
+                                    <span style="color: #888;">LED ${i+1}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     `;
                     break;
+
                 case 3: // 調頻模組
                     configHtml = `
-                        <label>目標頻率 (MHz 或數值)：</label>
-                        <input type="number" step="0.1" class="pixel-input config-val-input" data-key="target_frequency" data-index="${index}" value="${config.target_frequency || ''}" placeholder="例如: 98.7">
+                        <label style="font-size: 1.2rem;">目標頻率：<span id="freq-val-${index}" style="color: var(--neon-pink); font-size: 1.5rem; margin: 0 10px;">${config.target_frequency || 100.0}</span> MHz</label>
+                        <br><br>
+                        <input type="range" min="80.0" max="120.0" step="0.1" class="pixel-input config-val-input" data-key="target_frequency" data-index="${index}" value="${config.target_frequency || 100.0}" style="width: 100%; max-width: 400px; cursor: pointer;" oninput="document.getElementById('freq-val-${index}').innerText = parseFloat(this.value).toFixed(1)">
                     `;
                     break;
+
                 case 4: // RGB模組
-                    const colorSeq = config.color_sequence || [];
+                    const colorSlots = config.color_slots || ['RED', 'RED', 'RED', 'RED'];
                     configHtml = `
-                        <label>RGB 顏色順序 (點擊按鈕依序加入)：</label>
-                        <div style="margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #ff0055;" onclick="addRGB(${index}, 'RED')">紅色 (R)</button>
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #00ff55; color: black;" onclick="addRGB(${index}, 'GREEN')">綠色 (G)</button>
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px; background-color: #0055ff;" onclick="addRGB(${index}, 'BLUE')">藍色 (B)</button>
-                            <button type="button" class="pixel-btn pink" style="padding: 5px 10px;" onclick="clearRGB(${index})">清除</button>
+                        <label>RGB 顏色設定 (點擊下方燈號切換顏色)：</label>
+                        <div style="display: flex; gap: 20px; margin-top: 15px; padding: 15px; background: #111; border-radius: 8px; width: fit-content;">
+                            ${[0, 1, 2, 3].map(i => {
+                                const colDef = rgbColors.find(c => c.val === colorSlots[i]) || rgbColors[0];
+                                return `
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                    <button type="button" class="pixel-btn" style="width: 80px; height: 80px; border-radius: 50%; padding: 0; background-color: ${colDef.hex}; color: ${colDef.val==='WHITE'||colDef.val==='YELLOW'?'black':'white'}; border: 4px solid #333; font-size: 1.2rem; font-weight: bold; text-shadow: none; box-shadow: 0 0 15px ${colDef.hex};" onclick="cycleRGB(${index}, ${i})">
+                                        ${colDef.name}
+                                    </button>
+                                    <span style="color: #666;">燈 ${i+1}</span>
+                                </div>
+                                `;
+                            }).join('')}
                         </div>
-                        <input type="text" class="pixel-input" readonly value="${colorSeq.length > 0 ? colorSeq.join(' ➔ ') : '尚未設定顏色'}" style="background: #050510; border-color: var(--neon-blue);">
                     `;
                     break;
+
                 case 5: // 摩斯密碼模組
                     configHtml = `
                         <div class="grid" style="gap: 15px;">
@@ -149,50 +203,121 @@
                         </div>
                     `;
                     break;
+
                 case 6: // 旋鈕模組
+                    const steps = config.steps || [];
                     configHtml = `
-                        <label>目標旋鈕設定數值 (0 ~ 100)：</label>
-                        <input type="number" min="0" max="100" class="pixel-input config-val-input" data-key="target_value" data-index="${index}" value="${config.target_value || ''}" placeholder="例如: 75">
+                        <label>金庫旋鈕指令序列 (角度為 18 的倍數)：</label>
+                        <div style="margin: 15px 0; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; background: #111; padding: 15px; border-radius: 8px;">
+                            <select id="knob-dir-${index}" class="pixel-select" style="padding: 8px;">
+                                <option value="RIGHT">↻ 右轉</option>
+                                <option value="LEFT">↺ 左轉</option>
+                            </select>
+                            <input type="number" id="knob-deg-${index}" class="pixel-input" placeholder="角度 (例如 18, 36, 90)" step="18" min="18" style="width: 200px; padding: 8px;">
+                            <button type="button" class="pixel-btn" style="padding: 8px 15px;" onclick="addKnobStep(${index})">+ 加入指令</button>
+                            <button type="button" class="pixel-btn pink" style="padding: 8px 15px;" onclick="clearKnobSteps(${index})">清除全部</button>
+                        </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                            ${steps.length > 0 ? steps.map((s, idx) => `
+                                <div class="pixel-border" style="padding: 8px 12px; border-color: var(--neon-blue); background: #050515; display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: #888;">${idx+1}.</span> 
+                                    <span style="color: ${s.dir === 'RIGHT' ? 'var(--neon-yellow)' : 'var(--neon-pink)'}; font-size: 1.2rem;">${s.dir === 'RIGHT' ? '↻' : '↺'}</span>
+                                    <span>${s.dir === 'RIGHT' ? '右' : '左'} ${s.deg}°</span>
+                                </div>
+                            `).join('<span style="color: var(--primary-blue); align-self: center;">➔</span>') : '<span style="color: #666; font-style: italic;">尚未設定旋鈕步驟，請在上方新增。</span>'}
+                        </div>
                     `;
                     break;
+
                 case 7: // 密碼模組
                     configHtml = `
                         <label>數字密碼解答：</label>
                         <input type="text" class="pixel-input config-val-input" data-key="password" data-index="${index}" value="${config.password || ''}" placeholder="例如: 1234">
                     `;
                     break;
+
                 case 8: // 拆線模組
-                    const currentWire = config.wire_to_cut || 'RED';
+                    const wires = config.wires || [1, 1, 1, 1, 1, 1]; // 1 = connected, 0 = cut
                     configHtml = `
-                        <label>設定目標要剪斷的電線顏色：</label>
-                        <select class="pixel-select config-select-input" data-key="wire_to_cut" data-index="${index}">
-                            <option value="RED" ${currentWire === 'RED' ? 'selected' : ''}>紅線 (RED)</option>
-                            <option value="BLUE" ${currentWire === 'BLUE' ? 'selected' : ''}>藍線 (BLUE)</option>
-                            <option value="YELLOW" ${currentWire === 'YELLOW' ? 'selected' : ''}>黃線 (YELLOW)</option>
-                            <option value="GREEN" ${currentWire === 'GREEN' ? 'selected' : ''}>綠線 (GREEN)</option>
-                        </select>
-                    `;
-                    break;
-                case 9: // 符號指撥開關模組
-                    const switches = config.switch_states || [0, 0, 0, 0];
-                    configHtml = `
-                        <label>開關正確設定狀態 (勾選代表該開關要設定為 ON)：</label>
-                        <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
-                            ${[1, 2, 3, 4].map((num, i) => `
-                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--neon-yellow);">
-                                    <input type="checkbox" class="switch-checkbox" data-index="${index}" data-switch-idx="${i}" ${switches[i] === 1 ? 'checked' : ''} onchange="updateSwitch(${index}, ${i}, this.checked)" style="transform: scale(1.3); cursor: pointer;">
-                                    開關 ${num} (SW${num})
-                                </label>
+                        <label>設定目標要剪斷的電線 (直接點擊電線來剪斷或接回)：</label>
+                        <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px; background: #000; padding: 20px; border-radius: 8px; width: fit-content; border: 2px solid #222;">
+                            ${[0, 1, 2, 3, 4, 5].map(i => `
+                                <div onclick="toggleWire(${index}, ${i})" style="cursor: pointer; display: flex; align-items: center; gap: 15px; width: 300px; padding: 5px; background: #111; border-radius: 4px;">
+                                    <span style="color: #666; font-family: monospace; width: 30px; text-align: center;">W${i+1}</span>
+                                    <div style="height: 12px; width: 100%; background-color: ${wires[i] ? '#cc0000' : '#440000'}; border-radius: 6px; position: relative; box-shadow: ${wires[i] ? '0 0 8px #ff0000' : 'none'}; transition: all 0.2s;">
+                                        ${!wires[i] ? '<div style="position: absolute; left: 48%; top: -6px; width: 4%; height: 24px; background: #000; border-left: 2px solid #ff3333; border-right: 2px solid #ff3333;"></div>' : ''}
+                                    </div>
+                                    <span style="color: ${wires[i] ? 'var(--neon-blue)' : 'var(--neon-pink)'}; font-size: 0.8rem; width: 40px; text-align: center;">${wires[i] ? '接通' : '剪斷'}</span>
+                                </div>
                             `).join('')}
                         </div>
                     `;
                     break;
+
+                case 9: // 符號指撥開關模組
+                    const switches = config.switches || [
+                        {pos: 'TOP', segs: {}}, {pos: 'TOP', segs: {}}, {pos: 'TOP', segs: {}}, 
+                        {pos: 'TOP', segs: {}}, {pos: 'TOP', segs: {}}, {pos: 'TOP', segs: {}}
+                    ];
+                    
+                    configHtml = `
+                        <label>開關與符號顯示設定 (上層選開關位置，下層點擊米字七段顯示器來亮燈)：</label>
+                        <div style="display: flex; gap: 20px; margin-top: 15px; background: #050505; padding: 20px; border-radius: 8px; overflow-x: auto;">
+                            ${[0, 1, 2, 3, 4, 5].map(i => {
+                                const s = switches[i];
+                                const segs = s.segs || {};
+                                const c = (id) => segs[id] ? '#ff0000' : '#330000';
+                                const sVal = s.pos || 'TOP';
+                                
+                                return `
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; border: 1px solid #222; padding: 15px; border-radius: 8px; background: #111;">
+                                    <div style="text-align: center; color: var(--neon-yellow); margin-bottom: 5px;">SW ${i+1}</div>
+                                    
+                                    <select onchange="updateDIPSwitch(${index}, ${i}, this.value)" class="pixel-select" style="padding: 8px; font-size: 1rem; width: 80px; text-align: center; border-color: ${sVal==='TOP'?'#00ff00':sVal==='MID'?'#ffff00':'#ff0000'};">
+                                        <option value="TOP" ${sVal==='TOP'?'selected':''}>上</option>
+                                        <option value="MID" ${sVal==='MID'?'selected':''}>中</option>
+                                        <option value="BOT" ${sVal==='BOT'?'selected':''}>下</option>
+                                    </select>
+                                    
+                                    <div style="width: 80px; height: 110px; position: relative;">
+                                        <svg class="svg-14seg" width="80" height="110" viewBox="0 0 40 60" style="cursor: pointer; background: #000; border: 2px solid #222; border-radius: 4px; padding: 4px;">
+                                            <!-- Top/Bottom -->
+                                            <polygon points="8,2 32,2 28,6 12,6" fill="${c('a')}" onclick="toggleSeg(${index}, ${i}, 'a')" />
+                                            <polygon points="8,58 32,58 28,54 12,54" fill="${c('d')}" onclick="toggleSeg(${index}, ${i}, 'd')" />
+                                            <!-- Outer Verticals -->
+                                            <polygon points="38,4 38,28 34,24 34,8" fill="${c('b')}" onclick="toggleSeg(${index}, ${i}, 'b')" />
+                                            <polygon points="38,32 38,56 34,52 34,36" fill="${c('c')}" onclick="toggleSeg(${index}, ${i}, 'c')" />
+                                            <polygon points="2,32 2,56 6,52 6,36" fill="${c('e')}" onclick="toggleSeg(${index}, ${i}, 'e')" />
+                                            <polygon points="2,4 2,28 6,24 6,8" fill="${c('f')}" onclick="toggleSeg(${index}, ${i}, 'f')" />
+                                            <!-- Middle Horizontals -->
+                                            <polygon points="8,28 18,28 18,32 8,32" fill="${c('g1')}" onclick="toggleSeg(${index}, ${i}, 'g1')" />
+                                            <polygon points="22,28 32,28 32,32 22,32" fill="${c('g2')}" onclick="toggleSeg(${index}, ${i}, 'g2')" />
+                                            <!-- Center Verticals -->
+                                            <polygon points="18,8 22,8 22,26 18,26" fill="${c('l')}" onclick="toggleSeg(${index}, ${i}, 'l')" />
+                                            <polygon points="18,34 22,34 22,52 18,52" fill="${c('m')}" onclick="toggleSeg(${index}, ${i}, 'm')" />
+                                            <!-- Diagonals -->
+                                            <polygon points="8,8 11,8 17,25 14,25" fill="${c('h')}" onclick="toggleSeg(${index}, ${i}, 'h')" />
+                                            <polygon points="32,8 29,8 23,25 26,25" fill="${c('i')}" onclick="toggleSeg(${index}, ${i}, 'i')" />
+                                            <polygon points="14,35 17,35 11,52 8,52" fill="${c('j')}" onclick="toggleSeg(${index}, ${i}, 'j')" />
+                                            <polygon points="26,35 23,35 29,52 32,52" fill="${c('k')}" onclick="toggleSeg(${index}, ${i}, 'k')" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                    break;
+
                 default:
                     configHtml = `
                         <label>答案/設定 JSON (Config)：</label>
                         <input type="text" class="pixel-input config-val-input-raw" value='${JSON.stringify(config)}' data-index="${index}">
                     `;
             }
+
+            const modImageUrls = mod.image_urls || [];
+            let imagePreviewsHtml = modImageUrls.map(url => `<img src="${url}" style="max-height: 80px; border: 1px solid var(--primary-blue); display: block;">`).join('');
 
             modDiv.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--primary-blue); padding-bottom: 8px; margin-bottom: 15px;">
@@ -210,23 +335,21 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-bottom: 15px;">
-                    <label>關卡引導圖片 LEVEL IMAGE :</label>
-                    ${mod.image_url ? `
-                        <div style="margin-bottom: 8px;">
-                            <img src="${mod.image_url}" style="max-height: 80px; border: 1px solid var(--primary-blue); display: block; margin-bottom: 4px;">
-                            <span style="font-size: 0.8rem; color: var(--neon-pink);">已有上傳關卡圖片，重新選擇檔案將會替換。</span>
-                        </div>
-                    ` : ''}
-                    <input type="file" name="module_image_${index}" class="pixel-input" accept="image/*">
+                    <label>關卡引導圖片 LEVEL IMAGES (可多選) :</label>
+                    <div id="module-image-preview-${index}" style="display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                        ${imagePreviewsHtml}
+                    </div>
+                    ${modImageUrls.length > 0 ? '<span style="font-size: 0.8rem; color: var(--neon-pink); display: block; margin-bottom: 8px;">選擇新圖片將會替換掉原本的所有圖片。</span>' : ''}
+                    <input type="file" name="module_images_${index}" class="pixel-input" accept="image/*" multiple onchange="previewImages(this, 'module-image-preview-${index}')">
                 </div>
-                <div class="form-group" style="background: #050515; padding: 12px; border-radius: 4px; border: 1px solid #151535;">
+                <div class="form-group" style="background: #050515; padding: 15px; border-radius: 4px; border: 1px solid #151535; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
                     ${configHtml}
                 </div>
             `;
             container.appendChild(modDiv);
         });
         
-        // Register events for inputs inside rendered modules
+        // Re-bind basic inputs
         document.querySelectorAll('.time-input').forEach(input => {
             input.addEventListener('change', (e) => {
                 modules[e.target.dataset.index].time_limit = parseInt(e.target.value) || 60;
@@ -242,15 +365,7 @@
                 const idx = e.target.dataset.index;
                 const key = e.target.dataset.key;
                 if(!modules[idx].config_data) modules[idx].config_data = {};
-                modules[idx].config_data[key] = e.target.value;
-            });
-        });
-        document.querySelectorAll('.config-select-input').forEach(select => {
-            select.addEventListener('change', (e) => {
-                const idx = e.target.dataset.index;
-                const key = e.target.dataset.key;
-                if(!modules[idx].config_data) modules[idx].config_data = {};
-                modules[idx].config_data[key] = e.target.value;
+                modules[idx].config_data[key] = e.target.type === 'number' && e.target.step !== "" ? parseFloat(e.target.value) : e.target.value;
             });
         });
     }
@@ -268,16 +383,24 @@
         renderModules();
     }
 
-    // RGB Module Utilities
-    window.addRGB = function(index, color) {
+    // Altitude Module Utilities
+    window.updateHeight = function(index, colIdx, val) {
         if(!modules[index].config_data) modules[index].config_data = {};
-        if(!modules[index].config_data.color_sequence) modules[index].config_data.color_sequence = [];
-        modules[index].config_data.color_sequence.push(color);
-        renderModules();
+        if(!modules[index].config_data.heights) modules[index].config_data.heights = [1, 1, 1, 1, 1];
+        modules[index].config_data.heights[colIdx] = parseInt(val);
+        document.getElementById(`height-val-${index}-${colIdx}`).innerText = val;
     }
-    window.clearRGB = function(index) {
+
+    // RGB Module Utilities
+    window.cycleRGB = function(index, slotIdx) {
         if(!modules[index].config_data) modules[index].config_data = {};
-        modules[index].config_data.color_sequence = [];
+        if(!modules[index].config_data.color_slots) modules[index].config_data.color_slots = ['RED', 'RED', 'RED', 'RED'];
+        
+        let current = modules[index].config_data.color_slots[slotIdx];
+        let currIdx = rgbColors.findIndex(c => c.val === current);
+        let nextIdx = (currIdx + 1) % rgbColors.length;
+        
+        modules[index].config_data.color_slots[slotIdx] = rgbColors[nextIdx].val;
         renderModules();
     }
 
@@ -294,16 +417,67 @@
         }
     }
 
-    // Switch Module Utilities
-    window.updateSwitch = function(index, swIdx, checked) {
+    // Knob Module Utilities
+    window.addKnobStep = function(index) {
         if(!modules[index].config_data) modules[index].config_data = {};
-        if(!modules[index].config_data.switch_states) modules[index].config_data.switch_states = [0, 0, 0, 0];
-        modules[index].config_data.switch_states[swIdx] = checked ? 1 : 0;
+        if(!modules[index].config_data.steps) modules[index].config_data.steps = [];
+        
+        const dir = document.getElementById(`knob-dir-${index}`).value;
+        const deg = parseInt(document.getElementById(`knob-deg-${index}`).value);
+        
+        if (isNaN(deg) || deg < 18 || deg % 18 !== 0) {
+            alert("請輸入 18 的倍數角度！ (例如 18, 36, 90)");
+            return;
+        }
+        
+        modules[index].config_data.steps.push({dir: dir, deg: deg});
+        renderModules();
+    }
+    window.clearKnobSteps = function(index) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        modules[index].config_data.steps = [];
+        renderModules();
+    }
+
+    // Wire Module Utilities
+    window.toggleWire = function(index, wireIdx) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.wires) modules[index].config_data.wires = [1, 1, 1, 1, 1, 1];
+        
+        modules[index].config_data.wires[wireIdx] = modules[index].config_data.wires[wireIdx] ? 0 : 1;
+        renderModules();
+    }
+
+    // Symbol Switch Module Utilities
+    window.updateDIPSwitch = function(index, swIdx, pos) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.switches) {
+            modules[index].config_data.switches = Array(6).fill(null).map(()=>({pos: 'TOP', segs: {}}));
+        }
+        modules[index].config_data.switches[swIdx].pos = pos;
+        renderModules();
+    }
+    
+    window.toggleSeg = function(index, swIdx, segId) {
+        if(!modules[index].config_data) modules[index].config_data = {};
+        if(!modules[index].config_data.switches) {
+            modules[index].config_data.switches = Array(6).fill(null).map(()=>({pos: 'TOP', segs: {}}));
+        }
+        
+        let segs = modules[index].config_data.switches[swIdx].segs;
+        if(segs[segId]) {
+            delete segs[segId];
+        } else {
+            segs[segId] = true;
+        }
+        renderModules();
     }
 
     window.removeModule = function(index) {
-        modules.splice(index, 1);
-        renderModules();
+        if(confirm("確定要刪除這個關卡嗎？")) {
+            modules.splice(index, 1);
+            renderModules();
+        }
     }
 
     document.getElementById('add-module-btn').addEventListener('click', () => {
@@ -314,10 +488,13 @@
         let defaultConfig = {};
         switch(type) {
             case 1: defaultConfig = { sequence: [] }; break;
-            case 4: defaultConfig = { color_sequence: [] }; break;
+            case 2: defaultConfig = { heights: [1, 1, 1, 1, 1] }; break;
+            case 3: defaultConfig = { target_frequency: 100.0 }; break;
+            case 4: defaultConfig = { color_slots: ['RED', 'RED', 'RED', 'RED'] }; break;
             case 5: defaultConfig = { word: '', morse: '' }; break;
-            case 8: defaultConfig = { wire_to_cut: 'RED' }; break;
-            case 9: defaultConfig = { switch_states: [0, 0, 0, 0] }; break;
+            case 6: defaultConfig = { steps: [] }; break;
+            case 8: defaultConfig = { wires: [1, 1, 1, 1, 1, 1] }; break;
+            case 9: defaultConfig = { switches: Array(6).fill(null).map(()=>({pos: 'TOP', segs: {}})) }; break;
         }
 
         modules.push({
