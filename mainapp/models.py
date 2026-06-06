@@ -7,6 +7,7 @@ class Project(models.Model):
     story_intro = models.TextField(blank=True, null=True)
     story_image = models.ImageField(upload_to='project_images/', blank=True, null=True)
     max_errors = models.PositiveIntegerField(default=3, help_text="Maximum allowed errors before game over")
+    time_limit = models.PositiveIntegerField(default=3600, help_text="Global time limit in seconds")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

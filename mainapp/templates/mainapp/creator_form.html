@@ -25,6 +25,10 @@
                     <label>容許最大錯誤次數 MAX ERRORS :</label>
                     <input type="number" name="max_errors" class="pixel-input" min="1" max="20" required value="{{ project.max_errors|default:3 }}">
                 </div>
+                <div class="form-group">
+                    <label>專案總時間限制 (秒) TIME LIMIT :</label>
+                    <input type="number" name="time_limit" class="pixel-input" min="60" required value="{{ project.time_limit|default:3600 }}">
+                </div>
             </div>
 
             <div class="form-group">
@@ -149,12 +153,12 @@
                     const heights = config.heights || [1, 1, 1, 1, 1];
                     configHtml = `
                         <label>設定每個 LED 排燈的高度 (1 ~ 10)：</label>
-                        <div style="display: flex; gap: 30px; margin-top: 15px; padding: 10px; background: #000; border-radius: 8px;">
+                        <div style="display: flex; gap: 30px; margin-top: 15px; padding: 15px; padding-bottom: 20px; background: #000; border-radius: 8px; height: 240px; box-sizing: border-box;">
                             ${[0, 1, 2, 3, 4].map(i => `
-                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; height: 100%;">
                                     <span id="height-val-${index}-${i}" style="color: var(--neon-yellow); font-weight: bold; font-size: 1.2rem;">${heights[i]}</span>
-                                    <input type="range" min="1" max="10" step="1" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical; height: 120px; cursor: pointer;" value="${heights[i]}" oninput="updateHeight(${index}, ${i}, this.value)">
-                                    <span style="color: #888;">LED ${i+1}</span>
+                                    <input type="range" min="1" max="10" step="1" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical; height: 140px; cursor: pointer; margin: 0;" value="${heights[i]}" oninput="updateHeight(${index}, ${i}, this.value)">
+                                    <span style="color: #888; margin-top: auto;">LED ${i+1}</span>
                                 </div>
                             `).join('')}
                         </div>
@@ -193,8 +197,8 @@
                     configHtml = `
                         <div class="grid" style="gap: 15px;">
                             <div>
-                                <label>解答單字 (英文)：</label>
-                                <input type="text" class="pixel-input morse-word-input" data-index="${index}" value="${config.word || ''}" placeholder="例如: SOS" oninput="updateMorse(${index}, this.value)">
+                                <label>解答單字 (英文與數字)：</label>
+                                <input type="text" class="pixel-input morse-word-input" data-index="${index}" value="${config.word || ''}" placeholder="例如: SOS123" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); updateMorse(${index}, this.value)">
                             </div>
                             <div>
                                 <label>摩斯密碼 (自動生成)：</label>
@@ -232,7 +236,7 @@
                 case 7: // 密碼模組
                     configHtml = `
                         <label>數字密碼解答：</label>
-                        <input type="text" class="pixel-input config-val-input" data-key="password" data-index="${index}" value="${config.password || ''}" placeholder="例如: 1234">
+                        <input type="number" class="pixel-input config-val-input" data-key="password" data-index="${index}" value="${config.password || ''}" placeholder="例如: 1234" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                     `;
                     break;
 

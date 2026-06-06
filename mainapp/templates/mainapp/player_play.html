@@ -7,16 +7,18 @@
         <h2 style="color: var(--neon-blue); text-align: center; margin-top: 0;">遊戲狀態 STATUS</h2>
         
         <!-- 顯示專案背景圖 -->
-        {% if project.story_image %}
-            <div id="project-image-container" style="text-align: center; margin-bottom: 20px;">
-                <img src="{{ project.story_image.url }}" style="max-width: 100%; max-height: 220px; border: 2px solid var(--primary-blue); border-radius: 4px;">
-            </div>
-        {% endif %}
+        <div id="project-image-container" style="text-align: center; margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+            <!-- Images injected by JS -->
+        </div>
 
         <div style="display: flex; justify-content: space-around; margin: 20px 0; background: #050515; padding: 15px 0; border: 1px dashed var(--primary-blue);">
             <div style="text-align: center;">
-                <p style="color: var(--neon-yellow); margin-bottom: 5px; font-size: 0.9rem;">倒數計時 TIMER</p>
-                <div style="font-size: 2rem; color: var(--neon-yellow); font-family: monospace;" id="timer">-- : --</div>
+                <p style="color: var(--neon-yellow); margin-bottom: 5px; font-size: 0.9rem;">總時間 TOTAL TIME</p>
+                <div style="font-size: 2rem; color: var(--neon-yellow); font-family: monospace;" id="global-timer">-- : --</div>
+            </div>
+            <div style="text-align: center; border-left: 1px solid #333; border-right: 1px solid #333; padding: 0 20px;">
+                <p style="color: var(--primary-blue); margin-bottom: 5px; font-size: 0.9rem;">關卡時間 LEVEL TIME</p>
+                <div style="font-size: 2rem; color: var(--primary-blue); font-family: monospace;" id="timer">-- : --</div>
             </div>
             <div style="text-align: center;">
                 <p style="color: var(--neon-pink); margin-bottom: 5px; font-size: 0.9rem;">錯誤次數 ERRORS</p>
@@ -31,8 +33,8 @@
             <p id="story-text" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px;">{{ project.story_intro }}</p>
             
             <!-- 顯示關卡引導圖片 -->
-            <div id="module-image-container" style="display: none; text-align: center; margin-top: 15px; padding: 10px; background: #050510; border: 1px solid #202050;">
-                <img id="module-image" src="" style="max-width: 100%; max-height: 200px; border: 2px solid var(--neon-pink); border-radius: 4px;">
+            <div id="module-image-container" style="display: none; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 15px; padding: 10px; background: #050510; border: 1px solid #202050;">
+                <!-- Images injected by JS -->
             </div>
         </div>
         
@@ -44,24 +46,36 @@
 </div>
 
 <script>
-    // Safe parse project config passed from python view
     const projectConfig = {{ play_modules_json|default:'[]'|safe }};
     const maxErrorsAllowed = {{ project.max_errors|default:3 }};
+    const projectImageUrls = {{ project_image_urls_json|default:'[]'|safe }};
+    const globalTimeLimit = {{ project.time_limit|default:3600 }};
 
     const startBtn = document.getElementById('start-btn');
     const endBtn = document.getElementById('end-btn');
     const timerDisplay = document.getElementById('timer');
+    const globalTimerDisplay = document.getElementById('global-timer');
     const errorsDisplay = document.getElementById('errors');
     const storyTextDisplay = document.getElementById('story-text');
     const projectImageContainer = document.getElementById('project-image-container');
     const moduleImageContainer = document.getElementById('module-image-container');
-    const moduleImage = document.getElementById('module-image');
 
     let currentModuleIndex = 0;
     let timerInterval = null;
+    let globalTimerInterval = null;
     let timeRemaining = 0;
+    let globalTimeRemaining = 0;
     let errors = 0;
     let gameActive = false;
+    
+    // Render initial project images
+    if (projectImageUrls.length > 0) {
+        projectImageUrls.forEach(url => {
+            projectImageContainer.innerHTML += `<img src="${url}" style="max-width: 100%; max-height: 220px; border: 2px solid var(--primary-blue); border-radius: 4px;">`;
+        });
+    } else {
+        projectImageContainer.style.display = 'none';
+    }
 
     startBtn.addEventListener('click', () => {
         if (projectConfig.length === 0) {
@@ -78,9 +92,24 @@
         
         startBtn.style.display = 'none';
         endBtn.style.display = 'inline-block';
-        if (projectImageContainer) {
+        if (projectImageUrls.length > 0 && projectImageContainer) {
             projectImageContainer.style.display = 'none'; // 開始後隱藏專案大圖，留空間給關卡圖
         }
+        
+        globalTimeRemaining = globalTimeLimit;
+        clearInterval(globalTimerInterval);
+        updateGlobalTimerDisplay();
+        
+        globalTimerInterval = setInterval(() => {
+            globalTimeRemaining--;
+            updateGlobalTimerDisplay();
+            if (globalTimeRemaining <= 0) {
+                clearInterval(globalTimerInterval);
+                clearInterval(timerInterval);
+                storyTextDisplay.innerHTML += "<br><span style='color:red; font-weight:bold;'>⏳ 總時間到！炸彈已引爆！</span>";
+                setTimeout(() => resetGame("任務失敗！專案總時間超限。"), 2000);
+            }
+        }, 1000);
         
         loadModule(0);
     });
@@ -92,14 +121,16 @@
     function resetGame(statusText) {
         gameActive = false;
         clearInterval(timerInterval);
+        clearInterval(globalTimerInterval);
         startBtn.style.display = 'inline-block';
         endBtn.style.display = 'none';
         timerDisplay.textContent = "-- : --";
+        globalTimerDisplay.textContent = "-- : --";
         storyTextDisplay.textContent = statusText;
         moduleImageContainer.style.display = 'none';
-        moduleImage.src = '';
-        if (projectImageContainer) {
-            projectImageContainer.style.display = 'block';
+        moduleImageContainer.innerHTML = '';
+        if (projectImageUrls.length > 0 && projectImageContainer) {
+            projectImageContainer.style.display = 'flex';
         }
     }
 
@@ -107,6 +138,7 @@
         if (index >= projectConfig.length) {
             storyTextDisplay.innerHTML = "🎉 恭喜通關所有模組！遊戲結束。";
             clearInterval(timerInterval);
+            clearInterval(globalTimerInterval);
             timerDisplay.textContent = "00 : 00";
             moduleImageContainer.style.display = 'none';
             return;
@@ -117,12 +149,14 @@
         storyTextDisplay.innerHTML = `<span style="color:var(--neon-pink); font-weight:bold;">[關卡 ${index + 1} - ${getModuleName(mod.module_type)}]</span><br>${mod.story}`;
         
         // 載入關卡圖片
-        if (mod.image_url) {
-            moduleImage.src = mod.image_url;
-            moduleImageContainer.style.display = 'block';
+        moduleImageContainer.innerHTML = '';
+        if (mod.image_urls && mod.image_urls.length > 0) {
+            mod.image_urls.forEach(url => {
+                moduleImageContainer.innerHTML += `<img src="${url}" style="max-width: 100%; max-height: 200px; border: 2px solid var(--neon-pink); border-radius: 4px;">`;
+            });
+            moduleImageContainer.style.display = 'flex';
         } else {
             moduleImageContainer.style.display = 'none';
-            moduleImage.src = '';
         }
 
         timeRemaining = mod.time_limit;
@@ -144,6 +178,12 @@
         const mins = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
         const secs = (timeRemaining % 60).toString().padStart(2, '0');
         timerDisplay.textContent = `${mins} : ${secs}`;
+    }
+
+    function updateGlobalTimerDisplay() {
+        const mins = Math.floor(globalTimeRemaining / 60).toString().padStart(2, '0');
+        const secs = (globalTimeRemaining % 60).toString().padStart(2, '0');
+        globalTimerDisplay.textContent = `${mins} : ${secs}`;
     }
 
     function getModuleName(type) {

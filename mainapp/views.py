@@ -56,22 +56,30 @@ def creator_form(request, project_id=None):
         title = request.POST.get('title')
         story_intro = request.POST.get('story_intro')
         max_errors_str = request.POST.get('max_errors', '3')
+        time_limit_str = request.POST.get('time_limit', '3600')
         try:
             max_errors = int(max_errors_str)
         except ValueError:
             max_errors = 3
+            
+        try:
+            time_limit = int(time_limit_str)
+        except ValueError:
+            time_limit = 3600
 
         if not project:
             project = Project.objects.create(
                 creator=request.user, 
                 title=title, 
                 story_intro=story_intro,
-                max_errors=max_errors
+                max_errors=max_errors,
+                time_limit=time_limit
             )
         else:
             project.title = title
             project.story_intro = story_intro
             project.max_errors = max_errors
+            project.time_limit = time_limit
             project.save()
             
         # Handle Project Images upload (multiple)
@@ -175,17 +183,27 @@ def player_list(request):
 @login_required
 def player_play(request, project_id):
       project = get_object_or_404(Project, id=project_id)
+      
+      project_image_urls = [img.image.url for img in project.images.all()]
+      if not project_image_urls and project.story_image:
+          project_image_urls = [project.story_image.url]
+          
       modules_list = []
       for mod in project.modules.all():
+          image_urls = [img.image.url for img in mod.images.all()]
+          if not image_urls and mod.story_image:
+              image_urls = [mod.story_image.url]
+              
           modules_list.append({
               'module_type': mod.module_type,
               'time_limit': mod.time_limit,
               'story': mod.story_text or '',
-              'image_url': mod.story_image.url if mod.story_image else '',
+              'image_urls': image_urls,
               'config': mod.config_data or {}
           })
       modules_json = json.dumps(modules_list)
       return render(request, 'mainapp/player_play.html', {
           'project': project,
+          'project_image_urls_json': json.dumps(project_image_urls),
           'play_modules_json': modules_json
       })
