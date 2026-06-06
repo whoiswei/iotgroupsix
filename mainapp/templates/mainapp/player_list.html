@@ -11,6 +11,9 @@
                 <h3 style="color: var(--neon-blue);">{{ project.title }}</h3>
                 <p style="color: #aaa; font-size: 0.9rem;">作者: {{ project.creator.username }}</p>
                 <p>{{ project.story_intro|truncatechars:50 }}</p>
+                <div style="margin-top: 10px; color: var(--neon-pink); font-size: 0.9rem; font-family: monospace;">
+                    ⏱️ 專案總限時: {{ project.time_limit }} 秒
+                </div>
                 <div style="margin-top: 15px; text-align: center;">
                     <a href="{% url 'player_play' project.id %}" class="pixel-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow);">開始挑戰 PLAY</a>
                 </div>

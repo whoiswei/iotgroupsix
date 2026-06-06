@@ -153,7 +153,7 @@
                     const heights = config.heights || [1, 1, 1, 1, 1];
                     configHtml = `
                         <label>設定每個 LED 排燈的高度 (1 ~ 10)：</label>
-                        <div style="display: flex; gap: 30px; margin-top: 15px; padding: 15px; padding-bottom: 20px; background: #000; border-radius: 8px; height: 240px; box-sizing: border-box;">
+                        <div style="display: flex; gap: 30px; margin-top: 15px; padding: 15px; padding-bottom: 20px; background: #000; border-radius: 8px; height: 240px; box-sizing: border-box; width: fit-content; overflow-x: auto;">
                             ${[0, 1, 2, 3, 4].map(i => `
                                 <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; height: 100%;">
                                     <span id="height-val-${index}-${i}" style="color: var(--neon-yellow); font-weight: bold; font-size: 1.2rem;">${heights[i]}</span>
