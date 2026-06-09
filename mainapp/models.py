@@ -17,7 +17,7 @@ class Project(models.Model):
 class ProjectModule(models.Model):
     MODULE_CHOICES = [
         (1, '方向指令模組'),
-        (2, '指定高度模組'),
+        (2, '鑰匙模組'),
         (3, '調頻模組'),
         (4, 'RGB模組'),
         (5, '摩斯密碼模組'),
