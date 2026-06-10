@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from .models import Project, ProjectModule, ProjectImage, ProjectModuleImage
+from .models import Project, ProjectModule, ProjectImage, ProjectModuleImage, ProjectSuccessImage, ProjectFailureImage
 import json
 
 def home(request):
@@ -89,14 +89,17 @@ def creator_form(request, project_id=None):
             project.failure_text = failure_text
             project.save()
             
-        # Handle custom result images
-        if 'success_image' in request.FILES:
-            project.success_image = request.FILES['success_image']
-            project.save()
+        # Handle custom success result images (multiple)
+        if 'success_images' in request.FILES:
+            project.success_images.all().delete()
+            for img in request.FILES.getlist('success_images'):
+                ProjectSuccessImage.objects.create(project=project, image=img)
             
-        if 'failure_image' in request.FILES:
-            project.failure_image = request.FILES['failure_image']
-            project.save()
+        # Handle custom failure result images (multiple)
+        if 'failure_images' in request.FILES:
+            project.failure_images.all().delete()
+            for img in request.FILES.getlist('failure_images'):
+                ProjectFailureImage.objects.create(project=project, image=img)
             
         # Handle Project Images upload (multiple)
         if 'project_images' in request.FILES:
@@ -171,14 +174,20 @@ def creator_form(request, project_id=None):
     modules_json = json.dumps(modules_list)
     
     project_image_urls = []
+    success_image_urls = []
+    failure_image_urls = []
     if project:
         project_image_urls = [img.image.url for img in project.images.all()]
         if not project_image_urls and project.story_image:
             project_image_urls = [project.story_image.url]
+        success_image_urls = [img.image.url for img in project.success_images.all()]
+        failure_image_urls = [img.image.url for img in project.failure_images.all()]
         
     return render(request, 'mainapp/creator_form.html', {
         'project': project, 
         'project_image_urls': json.dumps(project_image_urls),
+        'success_image_urls_json': json.dumps(success_image_urls),
+        'failure_image_urls_json': json.dumps(failure_image_urls),
         'module_choices': ProjectModule.MODULE_CHOICES,
         'modules_json': modules_json
     })
@@ -218,8 +227,12 @@ def player_play(request, project_id):
               'config': mod.config_data or {}
           })
       modules_json = json.dumps(modules_list)
+      success_image_urls = [img.image.url for img in project.success_images.all()]
+      failure_image_urls = [img.image.url for img in project.failure_images.all()]
       return render(request, 'mainapp/player_play.html', {
           'project': project,
           'project_image_urls_json': json.dumps(project_image_urls),
-          'play_modules_json': modules_json
+          'play_modules_json': modules_json,
+          'success_image_urls_json': json.dumps(success_image_urls),
+          'failure_image_urls_json': json.dumps(failure_image_urls),
       })

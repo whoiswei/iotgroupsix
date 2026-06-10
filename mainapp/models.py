@@ -9,9 +9,7 @@ class Project(models.Model):
     max_errors = models.PositiveIntegerField(default=3, help_text="Maximum allowed errors before game over")
     time_limit = models.PositiveIntegerField(default=3600, help_text="Global time limit in seconds")
     success_text = models.TextField(blank=True, null=True, help_text="Custom text shown on success")
-    success_image = models.ImageField(upload_to='project_results/', blank=True, null=True, help_text="Custom image shown on success")
     failure_text = models.TextField(blank=True, null=True, help_text="Custom text shown on failure")
-    failure_image = models.ImageField(upload_to='project_results/', blank=True, null=True, help_text="Custom image shown on failure")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -52,4 +50,14 @@ class ProjectImage(models.Model):
 class ProjectModuleImage(models.Model):
     module = models.ForeignKey(ProjectModule, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='module_images/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class ProjectSuccessImage(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='success_images')
+    image = models.ImageField(upload_to='project_success/')
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class ProjectFailureImage(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='failure_images')
+    image = models.ImageField(upload_to='project_failure/')
     uploaded_at = models.DateTimeField(auto_now_add=True)

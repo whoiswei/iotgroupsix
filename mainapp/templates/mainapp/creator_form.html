@@ -50,24 +50,24 @@
                 <div class="form-group">
                     <label>成功過關顯示文字 SUCCESS TEXT :</label>
                     <textarea name="success_text" class="pixel-textarea" rows="3" placeholder="例如：恭喜過關！順利拆除炸彈！">{{ project.success_text|default_if_none:'' }}</textarea>
-                    <label style="margin-top: 10px; display: block;">成功過關圖片 SUCCESS IMAGE :</label>
-                    <input type="file" name="success_image" class="pixel-input" accept="image/*">
-                    {% if project.success_image %}
-                        <div style="margin-top: 8px;">
-                            <img src="{{ project.success_image.url }}" style="max-height: 80px; border: 2px solid var(--neon-blue); border-radius: 4px;">
-                        </div>
-                    {% endif %}
+                    
+                    <label style="margin-top: 10px; display: block;">成功過關圖片 SUCCESS IMAGES (可多選) :</label>
+                    <div id="success-image-preview" style="display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                        <!-- Previews injected by JS -->
+                    </div>
+                    <input type="file" name="success_images" class="pixel-input" accept="image/*" multiple onchange="previewImages(this, 'success-image-preview')">
+                    <span style="font-size: 0.8rem; color: var(--neon-pink);">選擇新圖片將會替換掉原本的所有圖片。</span>
                 </div>
                 <div class="form-group">
                     <label>失敗顯示文字 FAILURE TEXT :</label>
                     <textarea name="failure_text" class="pixel-textarea" rows="3" placeholder="例如：任務失敗！炸彈引爆！">{{ project.failure_text|default_if_none:'' }}</textarea>
-                    <label style="margin-top: 10px; display: block;">失敗圖片 FAILURE IMAGE :</label>
-                    <input type="file" name="failure_image" class="pixel-input" accept="image/*">
-                    {% if project.failure_image %}
-                        <div style="margin-top: 8px;">
-                            <img src="{{ project.failure_image.url }}" style="max-height: 80px; border: 2px solid var(--neon-pink); border-radius: 4px;">
-                        </div>
-                    {% endif %}
+                    
+                    <label style="margin-top: 10px; display: block;">失敗圖片 FAILURE IMAGES (可多選) :</label>
+                    <div id="failure-image-preview" style="display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+                        <!-- Previews injected by JS -->
+                    </div>
+                    <input type="file" name="failure_images" class="pixel-input" accept="image/*" multiple onchange="previewImages(this, 'failure-image-preview')">
+                    <span style="font-size: 0.8rem; color: var(--neon-pink);">選擇新圖片將會替換掉原本的所有圖片。</span>
                 </div>
             </div>
         </div>
@@ -97,6 +97,8 @@
     // Safe JSON parses
     let modules = {{ modules_json|default:'[]'|safe }};
     let initialProjectImages = {{ project_image_urls|default:'[]'|safe }};
+    let initialSuccessImages = {{ success_image_urls_json|default:'[]'|safe }};
+    let initialFailureImages = {{ failure_image_urls_json|default:'[]'|safe }};
     
     function renderProjectImagePreviews() {
         const previewDiv = document.getElementById('project-image-preview');
@@ -106,6 +108,21 @@
         });
     }
     renderProjectImagePreviews();
+
+    function renderResultImagePreviews() {
+        const successPreview = document.getElementById('success-image-preview');
+        successPreview.innerHTML = '';
+        initialSuccessImages.forEach(url => {
+            successPreview.innerHTML += `<img src="${url}" style="max-height: 80px; border: 2px solid var(--neon-blue); border-radius: 4px;">`;
+        });
+
+        const failurePreview = document.getElementById('failure-image-preview');
+        failurePreview.innerHTML = '';
+        initialFailureImages.forEach(url => {
+            failurePreview.innerHTML += `<img src="${url}" style="max-height: 80px; border: 2px solid var(--neon-pink); border-radius: 4px;">`;
+        });
+    }
+    renderResultImagePreviews();
 
     window.previewImages = function(input, previewId) {
         const previewDiv = document.getElementById(previewId);

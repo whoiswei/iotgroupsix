@@ -60,7 +60,7 @@
             <div style="background: #050515; padding: 20px; border: 1px dashed var(--primary-blue); margin: 20px 0; border-radius: 8px;">
                 <p id="result-text" style="font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap; text-align: left;"></p>
                 
-                <div id="result-image-container" style="margin-top: 15px; display: flex; justify-content: center;">
+                <div id="result-image-container" style="margin-top: 15px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;">
                     <!-- Result image injected by JS -->
                 </div>
             </div>
@@ -81,9 +81,9 @@
     const globalTimeLimit = {{ project.time_limit|default:3600 }};
 
     const successText = "{{ project.success_text|default:''|escapejs }}";
-    const successImageUrl = "{% if project.success_image %}{{ project.success_image.url }}{% endif %}";
+    const successImageUrls = {{ success_image_urls_json|default:'[]'|safe }};
     const failureText = "{{ project.failure_text|default:''|escapejs }}";
-    const failureImageUrl = "{% if project.failure_image %}{{ project.failure_image.url }}{% endif %}";
+    const failureImageUrls = {{ failure_image_urls_json|default:'[]'|safe }};
 
     const startBtn = document.getElementById('start-btn');
     const endBtn = document.getElementById('end-btn');
@@ -173,8 +173,10 @@
             resultTitle.style.textShadow = "0 0 15px var(--neon-blue)";
             
             resultText.textContent = successText ? successText : (fallbackReason || "恭喜通關所有模組！遊戲成功結束。");
-            if (successImageUrl) {
-                resultImgContainer.innerHTML = `<img src="${successImageUrl}" style="max-width: 100%; max-height: 250px; border: 2px solid var(--neon-blue); border-radius: 4px; box-shadow: 0 0 15px var(--neon-blue);">`;
+            if (successImageUrls.length > 0) {
+                successImageUrls.forEach(url => {
+                    resultImgContainer.innerHTML += `<img src="${url}" style="max-width: 100%; max-height: 200px; border: 2px solid var(--neon-blue); border-radius: 4px; box-shadow: 0 0 15px var(--neon-blue);">`;
+                });
             }
         } else {
             resultTitle.textContent = "任務失敗 FAILED";
@@ -182,8 +184,10 @@
             resultTitle.style.textShadow = "0 0 15px var(--neon-pink)";
             
             resultText.textContent = failureText ? failureText : (fallbackReason || "任務失敗！炸彈已引爆！");
-            if (failureImageUrl) {
-                resultImgContainer.innerHTML = `<img src="${failureImageUrl}" style="max-width: 100%; max-height: 250px; border: 2px solid var(--neon-pink); border-radius: 4px; box-shadow: 0 0 15px var(--neon-pink);">`;
+            if (failureImageUrls.length > 0) {
+                failureImageUrls.forEach(url => {
+                    resultImgContainer.innerHTML += `<img src="${url}" style="max-width: 100%; max-height: 200px; border: 2px solid var(--neon-pink); border-radius: 4px; box-shadow: 0 0 15px var(--neon-pink);">`;
+                });
             }
         }
     }
