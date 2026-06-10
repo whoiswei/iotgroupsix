@@ -32,7 +32,7 @@
                 </div>
                 <div class="form-group">
                     <label>專案總時間限制 (秒) TIME LIMIT :</label>
-                    <input type="number" name="time_limit" class="pixel-input" min="60" required value="{{ project.time_limit|default:3600 }}">
+                    <input type="number" name="time_limit" class="pixel-input" min="1" required value="{{ project.time_limit|default:3600 }}">
                 </div>
             </div>
 
@@ -43,6 +43,32 @@
                 </div>
                 <input type="file" name="project_images" class="pixel-input" accept="image/*" multiple onchange="previewImages(this, 'project-image-preview')">
                 <span style="font-size: 0.8rem; color: var(--neon-pink);">選擇新圖片將會替換掉原本的所有圖片。</span>
+            </div>
+
+            <h3 style="color: var(--neon-yellow); margin-top: 25px; border-top: 1px dashed var(--primary-blue); padding-top: 20px;">過關與失敗自訂畫面 SETTLEMENT SETTINGS</h3>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>成功過關顯示文字 SUCCESS TEXT :</label>
+                    <textarea name="success_text" class="pixel-textarea" rows="3" placeholder="例如：恭喜過關！順利拆除炸彈！">{{ project.success_text|default_if_none:'' }}</textarea>
+                    <label style="margin-top: 10px; display: block;">成功過關圖片 SUCCESS IMAGE :</label>
+                    <input type="file" name="success_image" class="pixel-input" accept="image/*">
+                    {% if project.success_image %}
+                        <div style="margin-top: 8px;">
+                            <img src="{{ project.success_image.url }}" style="max-height: 80px; border: 2px solid var(--neon-blue); border-radius: 4px;">
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="form-group">
+                    <label>失敗顯示文字 FAILURE TEXT :</label>
+                    <textarea name="failure_text" class="pixel-textarea" rows="3" placeholder="例如：任務失敗！炸彈引爆！">{{ project.failure_text|default_if_none:'' }}</textarea>
+                    <label style="margin-top: 10px; display: block;">失敗圖片 FAILURE IMAGE :</label>
+                    <input type="file" name="failure_image" class="pixel-input" accept="image/*">
+                    {% if project.failure_image %}
+                        <div style="margin-top: 8px;">
+                            <img src="{{ project.failure_image.url }}" style="max-height: 80px; border: 2px solid var(--neon-pink); border-radius: 4px;">
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -140,16 +166,53 @@
             switch(type) {
                 case 1: // 方向指令模組
                     const seq = config.sequence || [];
-                    configHtml = `
-                        <label>方向指令順序 (點擊按鈕依序加入)：</label>
-                        <div style="margin: 8px 0; display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'UP')">↑ 上 (UP)</button>
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'DOWN')">↓ 下 (DOWN)</button>
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'LEFT')">← 左 (LEFT)</button>
-                            <button type="button" class="pixel-btn" style="padding: 5px 10px;" onclick="addDirection(${index}, 'RIGHT')">→ 右 (RIGHT)</button>
-                            <button type="button" class="pixel-btn pink" style="padding: 5px 10px;" onclick="clearDirections(${index})">清除</button>
+                    let blocksHtml = '';
+                    
+                    const activeInsertDirIdx = window.activeInsertDirIndex && window.activeInsertDirIndex.moduleIndex === index ? window.activeInsertDirIndex.insertIndex : null;
+                    
+                    const renderInsertTrigger = (insertIdx) => {
+                        if (activeInsertDirIdx === insertIdx) {
+                            return `
+                                <div style="display: inline-flex; gap: 4px; padding: 2px; background: #222; border: 1px solid var(--neon-yellow); border-radius: 4px; align-items: center; z-index: 10;">
+                                    <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0;" onclick="insertDirectionAt(${index}, ${insertIdx}, 'UP')">↑</button>
+                                    <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0;" onclick="insertDirectionAt(${index}, ${insertIdx}, 'DOWN')">↓</button>
+                                    <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0;" onclick="insertDirectionAt(${index}, ${insertIdx}, 'LEFT')">←</button>
+                                    <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0;" onclick="insertDirectionAt(${index}, ${insertIdx}, 'RIGHT')">→</button>
+                                    <button type="button" class="pixel-btn pink" style="padding: 2px 6px; font-size: 0.8rem; margin: 0;" onclick="cancelInsertDirection()">✕</button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0; min-width: 24px; border-color: #333; color: #666;" onclick="showInsertDirection(${index}, ${insertIdx})">+</button>
+                            `;
+                        }
+                    };
+
+                    blocksHtml = `
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #000; padding: 15px; border-radius: 8px; max-width: 100%; box-sizing: border-box; border: 1px solid #151535; min-height: 50px;">
+                            ${renderInsertTrigger(0)}
+                            ${seq.map((dir, dirIdx) => {
+                                const dirSymbols = { 'UP': '↑ 上', 'DOWN': '↓ 下', 'LEFT': '← 左', 'RIGHT': '→ 右' };
+                                const symbol = dirSymbols[dir] || dir;
+                                return `
+                                    <div class="pixel-border" style="padding: 4px 8px; margin: 0; display: inline-flex; align-items: center; gap: 6px; background: #050515; border-color: var(--neon-blue); height: 32px; box-sizing: border-box; box-shadow: none;">
+                                        <span style="color: var(--neon-yellow); font-weight: bold; font-family: monospace;">${symbol}</span>
+                                        <span style="color: var(--neon-pink); font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-left: 4px;" onclick="removeDirectionAt(${index}, ${dirIdx})">×</span>
+                                    </div>
+                                    ${renderInsertTrigger(dirIdx + 1)}
+                                `;
+                            }).join('')}
                         </div>
-                        <input type="text" class="pixel-input" readonly value="${seq.length > 0 ? seq.join(' ➔ ') : '尚未設定方向'}" style="background: #050510; border-color: var(--neon-pink);">
+                    `;
+
+                    configHtml = `
+                        <label>方向指令順序 (在序列中點擊 + 號可隨時插入指令，點擊 × 可刪除該指令)：</label>
+                        <div style="margin-top: 10px;">
+                            ${blocksHtml}
+                        </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <button type="button" class="pixel-btn pink" style="padding: 5px 12px; font-size: 0.9rem;" onclick="clearDirections(${index})">清除全部</button>
+                        </div>
                     `;
                     break;
 
@@ -237,25 +300,55 @@
 
                 case 6: // 旋鈕模組
                     const steps = config.steps || [];
-                    configHtml = `
-                        <label>金庫旋鈕指令序列 (角度為 18 的倍數)：</label>
-                        <div style="margin: 15px 0; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; background: #111; padding: 15px; border-radius: 8px;">
-                            <select id="knob-dir-${index}" class="pixel-select" style="padding: 8px;">
-                                <option value="RIGHT">↻ 右轉</option>
-                                <option value="LEFT">↺ 左轉</option>
-                            </select>
-                            <input type="number" id="knob-deg-${index}" class="pixel-input" placeholder="角度 (例如 18, 36, 90)" step="18" min="18" style="width: 200px; padding: 8px;">
-                            <button type="button" class="pixel-btn" style="padding: 8px 15px;" onclick="addKnobStep(${index})">+ 加入指令</button>
-                            <button type="button" class="pixel-btn pink" style="padding: 8px 15px;" onclick="clearKnobSteps(${index})">清除全部</button>
-                        </div>
-                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                            ${steps.length > 0 ? steps.map((s, idx) => `
-                                <div class="pixel-border" style="padding: 8px 12px; border-color: var(--neon-blue); background: #050515; display: flex; align-items: center; gap: 8px;">
-                                    <span style="color: #888;">${idx+1}.</span> 
-                                    <span style="color: ${s.dir === 'RIGHT' ? 'var(--neon-yellow)' : 'var(--neon-pink)'}; font-size: 1.2rem;">${s.dir === 'RIGHT' ? '↻' : '↺'}</span>
-                                    <span>${s.dir === 'RIGHT' ? '右' : '左'} ${s.deg}°</span>
+                    let stepsHtml = '';
+                    
+                    const activeInsertKnobIdx = window.activeInsertKnobIndex && window.activeInsertKnobIndex.moduleIndex === index ? window.activeInsertKnobIndex.insertIndex : null;
+                    
+                    const renderKnobInsertTrigger = (insertIdx) => {
+                        if (activeInsertKnobIdx === insertIdx) {
+                            return `
+                                <div style="display: inline-flex; gap: 8px; padding: 6px; background: #151525; border: 1px solid var(--neon-yellow); border-radius: 4px; align-items: center; flex-wrap: wrap; margin: 5px 0; z-index: 10;">
+                                    <select id="insert-knob-dir-${index}-${insertIdx}" class="pixel-select" style="padding: 2px 5px; font-size: 0.8rem; margin: 0; width: auto; height: auto; border-color: var(--neon-blue);">
+                                        <option value="RIGHT">↻ 右轉</option>
+                                        <option value="LEFT">↺ 左轉</option>
+                                    </select>
+                                    <input type="number" id="insert-knob-deg-${index}-${insertIdx}" class="pixel-input" placeholder="角度 (18的倍數)" step="18" min="18" style="padding: 2px 5px; font-size: 0.8rem; margin: 0; width: 100px; height: auto; border-color: var(--neon-blue);" value="90">
+                                    <button type="button" class="pixel-btn" style="padding: 2px 8px; font-size: 0.8rem; margin: 0;" onclick="confirmInsertKnobStep(${index}, ${insertIdx})">✔</button>
+                                    <button type="button" class="pixel-btn pink" style="padding: 2px 8px; font-size: 0.8rem; margin: 0;" onclick="cancelInsertKnobStep()">✕</button>
                                 </div>
-                            `).join('<span style="color: var(--primary-blue); align-self: center;">➔</span>') : '<span style="color: #666; font-style: italic;">尚未設定旋鈕步驟，請在上方新增。</span>'}
+                            `;
+                        } else {
+                            return `
+                                <button type="button" class="pixel-btn" style="padding: 2px 6px; font-size: 0.8rem; margin: 0; min-width: 24px; border-color: #333; color: #666;" onclick="showInsertKnobStep(${index}, ${insertIdx})">+</button>
+                            `;
+                        }
+                    };
+
+                    stepsHtml = `
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #000; padding: 15px; border-radius: 8px; max-width: 100%; box-sizing: border-box; border: 1px solid #151535; min-height: 50px;">
+                            ${renderKnobInsertTrigger(0)}
+                            ${steps.map((s, idx) => {
+                                return `
+                                    <div class="pixel-border" style="padding: 4px 8px; margin: 0; display: inline-flex; align-items: center; gap: 6px; background: #050515; border-color: var(--neon-blue); height: 32px; box-sizing: border-box; box-shadow: none;">
+                                        <span style="color: #888; font-size: 0.8rem;">${idx+1}.</span> 
+                                        <span style="color: ${s.dir === 'RIGHT' ? 'var(--neon-yellow)' : 'var(--neon-pink)'}; font-weight: bold; font-size: 1.1rem; display: flex; align-items: center; gap: 4px;">
+                                            ${s.dir === 'RIGHT' ? '↻' : '↺'} ${s.dir === 'RIGHT' ? '右' : '左'}${s.deg}°
+                                        </span>
+                                        <span style="color: var(--neon-pink); font-weight: bold; cursor: pointer; font-size: 1.1rem;" onclick="removeKnobStepAt(${index}, ${idx})">×</span>
+                                    </div>
+                                    ${renderKnobInsertTrigger(idx + 1)}
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+
+                    configHtml = `
+                        <label>金庫旋鈕指令序列 (在序列中點擊 + 號可隨時插入步驟，點擊 × 可刪除該步驟)：</label>
+                        <div style="margin-top: 10px;">
+                            ${stepsHtml}
+                        </div>
+                        <div style="margin-top: 10px; display: flex; gap: 8px;">
+                            <button type="button" class="pixel-btn pink" style="padding: 5px 12px; font-size: 0.9rem;" onclick="clearKnobSteps(${index})">清除全部</button>
                         </div>
                     `;
                     break;
@@ -357,14 +450,27 @@
             let imagePreviewsHtml = modImageUrls.map(url => `<img src="${url}" style="max-height: 80px; border: 1px solid var(--primary-blue); display: block;">`).join('');
 
             modDiv.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--primary-blue); padding-bottom: 8px; margin-bottom: 15px;">
-                    <h3 style="color: var(--neon-pink); margin: 0;">#${index + 1} - ${mod.module_name}</h3>
-                    <button type="button" class="pixel-btn pink" style="padding: 5px 12px; font-size: 0.8rem; margin: 0;" onclick="removeModule(${index})">刪除關卡</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px dashed var(--primary-blue); padding-bottom: 8px; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h3 style="color: var(--neon-pink); margin: 0;">#${index + 1} - ${mod.module_name}</h3>
+                        <div style="display: flex; gap: 5px;">
+                            <button type="button" class="pixel-btn" style="padding: 2px 8px; font-size: 0.8rem; margin: 0; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="moveModuleUp(${index})" ${index === 0 ? 'disabled style="opacity: 0.3; pointer-events: none;"' : ''}>▲ 上移</button>
+                            <button type="button" class="pixel-btn" style="padding: 2px 8px; font-size: 0.8rem; margin: 0; border-color: var(--neon-blue); color: var(--neon-blue);" onclick="moveModuleDown(${index})" ${index === modules.length - 1 ? 'disabled style="opacity: 0.3; pointer-events: none;"' : ''}>▼ 下移</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <span style="color: #888; font-size: 0.85rem;">在此之前插入:</span>
+                        <select id="insert-select-${index}" class="pixel-select" style="padding: 4px; font-size: 0.85rem; margin: 0; width: auto; border-color: var(--neon-yellow); color: var(--neon-yellow); height: auto;">
+                            ${[...document.getElementById('module-selector').options].map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('')}
+                        </select>
+                        <button type="button" class="pixel-btn" style="padding: 4px 10px; font-size: 0.85rem; margin: 0; border-color: var(--neon-yellow); color: var(--neon-yellow);" onclick="insertModuleAt(${index})">+ 插入</button>
+                        <button type="button" class="pixel-btn pink" style="padding: 4px 12px; font-size: 0.85rem; margin: 0;" onclick="removeModule(${index})">刪除關卡</button>
+                    </div>
                 </div>
                 <div class="grid" style="grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 15px;">
                     <div class="form-group">
                         <label>限制秒數 Time (秒)：</label>
-                        <input type="number" class="pixel-input time-input" value="${mod.time_limit}" data-index="${index}" min="10">
+                        <input type="number" class="pixel-input time-input" value="${mod.time_limit}" data-index="${index}" min="1">
                     </div>
                     <div class="form-group">
                         <label>關卡故事引導 Story Text：</label>
@@ -512,7 +618,119 @@
         }
         renderModules();
     }
+    // Module Reordering & Custom Inserting
+    window.moveModuleUp = function(index) {
+        if (index > 0) {
+            const temp = modules[index];
+            modules[index] = modules[index - 1];
+            modules[index - 1] = temp;
+            renderModules();
+        }
+    }
+    
+    window.moveModuleDown = function(index) {
+        if (index < modules.length - 1) {
+            const temp = modules[index];
+            modules[index] = modules[index + 1];
+            modules[index + 1] = temp;
+            renderModules();
+        }
+    }
+    
+    window.insertModuleAt = function(index) {
+        const select = document.getElementById(`insert-select-${index}`);
+        const type = parseInt(select.value);
+        const name = select.options[select.selectedIndex].text;
+        
+        let defaultConfig = {};
+        switch(type) {
+            case 1: defaultConfig = { sequence: [] }; break;
+            case 2: defaultConfig = { heights: [1, 1, 1, 1, 1] }; break;
+            case 3: defaultConfig = { target_frequency: 100.0 }; break;
+            case 4: defaultConfig = { color_slots: ['RED', 'RED', 'RED', 'RED'] }; break;
+            case 5: defaultConfig = { word: '', morse: '' }; break;
+            case 6: defaultConfig = { steps: [] }; break;
+            case 8: defaultConfig = { wires: [1, 1, 1, 1, 1, 1] }; break;
+            case 9: defaultConfig = { switches: Array(6).fill(null).map(()=>({pos: 'TOP', segs: {}})) }; break;
+        }
+        
+        modules.splice(index, 0, {
+            module_type: type,
+            module_name: name,
+            time_limit: 60,
+            story_text: '',
+            config_data: defaultConfig
+        });
+        renderModules();
+    }
 
+    // Direction Module Utilities
+    window.activeInsertDirIndex = null;
+    
+    window.showInsertDirection = function(moduleIndex, insertIndex) {
+        window.activeInsertDirIndex = { moduleIndex, insertIndex };
+        renderModules();
+    }
+    
+    window.cancelInsertDirection = function() {
+        window.activeInsertDirIndex = null;
+        renderModules();
+    }
+    
+    window.insertDirectionAt = function(moduleIndex, insertIndex, direction) {
+        if(!modules[moduleIndex].config_data) modules[moduleIndex].config_data = {};
+        if(!modules[moduleIndex].config_data.sequence) modules[moduleIndex].config_data.sequence = [];
+        
+        modules[moduleIndex].config_data.sequence.splice(insertIndex, 0, direction);
+        window.activeInsertDirIndex = null;
+        renderModules();
+    }
+    
+    window.removeDirectionAt = function(moduleIndex, dirIndex) {
+        if(!modules[moduleIndex].config_data) modules[moduleIndex].config_data = {};
+        if(!modules[moduleIndex].config_data.sequence) modules[moduleIndex].config_data.sequence = [];
+        
+        modules[moduleIndex].config_data.sequence.splice(dirIndex, 1);
+        renderModules();
+    }
+
+    // Knob Module Utilities
+    window.activeInsertKnobIndex = null;
+    
+    window.showInsertKnobStep = function(moduleIndex, insertIndex) {
+        window.activeInsertKnobIndex = { moduleIndex, insertIndex };
+        renderModules();
+    }
+    
+    window.cancelInsertKnobStep = function() {
+        window.activeInsertKnobIndex = null;
+        renderModules();
+    }
+    
+    window.confirmInsertKnobStep = function(moduleIndex, insertIndex) {
+        if(!modules[moduleIndex].config_data) modules[moduleIndex].config_data = {};
+        if(!modules[moduleIndex].config_data.steps) modules[moduleIndex].config_data.steps = [];
+        
+        const dir = document.getElementById(`insert-knob-dir-${moduleIndex}-${insertIndex}`).value;
+        const deg = parseInt(document.getElementById(`insert-knob-deg-${moduleIndex}-${insertIndex}`).value);
+        
+        if (isNaN(deg) || deg < 18 || deg % 18 !== 0) {
+            alert("請輸入 18 的倍數角度！ (例如 18, 36, 90)");
+            return;
+        }
+        
+        modules[moduleIndex].config_data.steps.splice(insertIndex, 0, { dir: dir, deg: deg });
+        window.activeInsertKnobIndex = null;
+        renderModules();
+    }
+    
+    window.removeKnobStepAt = function(moduleIndex, stepIndex) {
+        if(!modules[moduleIndex].config_data) modules[moduleIndex].config_data = {};
+        if(!modules[moduleIndex].config_data.steps) modules[moduleIndex].config_data.steps = [];
+        
+        modules[moduleIndex].config_data.steps.splice(stepIndex, 1);
+        renderModules();
+    }
     window.removeModule = function(index) {
         if(confirm("確定要刪除這個關卡嗎？")) {
             modules.splice(index, 1);

@@ -67,19 +67,35 @@ def creator_form(request, project_id=None):
         except ValueError:
             time_limit = 3600
 
+        success_text = request.POST.get('success_text')
+        failure_text = request.POST.get('failure_text')
+
         if not project:
             project = Project.objects.create(
                 creator=request.user, 
                 title=title, 
                 story_intro=story_intro,
                 max_errors=max_errors,
-                time_limit=time_limit
+                time_limit=time_limit,
+                success_text=success_text,
+                failure_text=failure_text
             )
         else:
             project.title = title
             project.story_intro = story_intro
             project.max_errors = max_errors
             project.time_limit = time_limit
+            project.success_text = success_text
+            project.failure_text = failure_text
+            project.save()
+            
+        # Handle custom result images
+        if 'success_image' in request.FILES:
+            project.success_image = request.FILES['success_image']
+            project.save()
+            
+        if 'failure_image' in request.FILES:
+            project.failure_image = request.FILES['failure_image']
             project.save()
             
         # Handle Project Images upload (multiple)

@@ -3,45 +3,74 @@
 <div style="text-align: center;">
     <h1 style="color: var(--neon-pink);">{{ project.title }}</h1>
     
-    <div class="pixel-border" style="border-color: var(--neon-blue); max-width: 600px; margin: 0 auto; text-align: left; background: #0c0c20;">
-        <h2 style="color: var(--neon-blue); text-align: center; margin-top: 0;">遊戲狀態 STATUS</h2>
+    <div class="pixel-border" style="border-color: var(--neon-blue); max-width: 600px; margin: 0 auto; text-align: left; background: #0c0c20; box-sizing: border-box; overflow: hidden; padding: 25px;">
         
-        <!-- 顯示專案背景圖 -->
-        <div id="project-image-container" style="text-align: center; margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-            <!-- Images injected by JS -->
-        </div>
-
-        <div style="display: flex; justify-content: space-around; margin: 20px 0; background: #050515; padding: 15px 0; border: 1px dashed var(--primary-blue);">
-            <div style="text-align: center;">
-                <p style="color: var(--neon-yellow); margin-bottom: 5px; font-size: 0.9rem;">總時間 TOTAL TIME</p>
-                <div style="font-size: 2rem; color: var(--neon-yellow); font-family: monospace;" id="global-timer">-- : --</div>
-            </div>
-            <div style="text-align: center; border-left: 1px solid #333; border-right: 1px solid #333; padding: 0 20px;">
-                <p style="color: var(--primary-blue); margin-bottom: 5px; font-size: 0.9rem;">關卡時間 LEVEL TIME</p>
-                <div style="font-size: 2rem; color: var(--primary-blue); font-family: monospace;" id="timer">-- : --</div>
-            </div>
-            <div style="text-align: center;">
-                <p style="color: var(--neon-pink); margin-bottom: 5px; font-size: 0.9rem;">錯誤次數 ERRORS</p>
-                <div style="font-size: 2rem; color: var(--neon-pink); font-family: monospace;">
-                    <span id="errors">0</span> / <span id="max-errors">{{ project.max_errors }}</span>
+        <!-- ==================== 1. 遊戲面板 ==================== -->
+        <div id="game-panel">
+            <h2 style="color: var(--neon-blue); text-align: center; margin-top: 0;">遊戲狀態 STATUS</h2>
+            
+            <div style="display: flex; justify-content: space-around; margin: 20px 0; background: #050515; padding: 15px 0; border: 1px dashed var(--primary-blue);">
+                <div style="text-align: center;">
+                    <p style="color: var(--neon-yellow); margin-bottom: 5px; font-size: 0.9rem;">總時間 TOTAL TIME</p>
+                    <div style="font-size: 2rem; color: var(--neon-yellow); font-family: monospace;" id="global-timer">-- : --</div>
+                </div>
+                <div style="text-align: center; border-left: 1px solid #333; border-right: 1px solid #333; padding: 0 20px;">
+                    <p style="color: var(--primary-blue); margin-bottom: 5px; font-size: 0.9rem;">關卡時間 LEVEL TIME</p>
+                    <div style="font-size: 2rem; color: var(--primary-blue); font-family: monospace;" id="timer">-- : --</div>
+                </div>
+                <div style="text-align: center;">
+                    <p style="color: var(--neon-pink); margin-bottom: 5px; font-size: 0.9rem;">錯誤次數 ERRORS</p>
+                    <div style="font-size: 2rem; color: var(--neon-pink); font-family: monospace;">
+                        <span id="errors">0</span> / <span id="max-errors">{{ project.max_errors }}</span>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div style="border-top: 2px dashed var(--primary-blue); padding-top: 20px; margin-top: 20px;">
-            <h3 style="color: var(--neon-blue); margin-top: 0;">故事介面 STORY :</h3>
+            <hr style="border: 1px dashed var(--primary-blue); margin: 25px 0;">
+
+            <h2 style="color: var(--neon-blue); text-align: center; margin-top: 0;">故事劇情 STORY</h2>
+            
             <p id="story-text" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px;">{{ project.story_intro }}</p>
             
-            <!-- 顯示關卡引導圖片 -->
-            <div id="module-image-container" style="display: none; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 15px; padding: 10px; background: #050510; border: 1px solid #202050;">
-                <!-- Images injected by JS -->
+            <!-- 顯示圖片的區域 -->
+            <div id="image-display-section" style="text-align: center; margin-top: 15px;">
+                <!-- 專案背景圖 -->
+                <div id="project-image-container" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                    <!-- Images injected by JS -->
+                </div>
+                
+                <!-- 關卡引導圖片 -->
+                <div id="module-image-container" style="display: none; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 10px; background: #050510; border: 1px solid #202050;">
+                    <!-- Images injected by JS -->
+                </div>
+            </div>
+            
+            <hr style="border: 1px dashed var(--primary-blue); margin: 25px 0;">
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="start-btn" class="pixel-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow); margin: 0;">開始連線 START</button>
+                <button id="end-btn" class="pixel-btn pink" style="display: none; margin: 0;">強制結束 END</button>
             </div>
         </div>
-        
-        <div style="text-align: center; margin-top: 30px;">
-            <button id="start-btn" class="pixel-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow);">開始連線 START</button>
-            <button id="end-btn" class="pixel-btn pink" style="display: none;">強制結束 END</button>
+
+        <!-- ==================== 2. 結算面板 ==================== -->
+        <div id="results-panel" style="display: none; text-align: center;">
+            <h2 id="result-title" style="font-size: 2.3rem; text-shadow: 0 0 10px var(--neon-blue); margin-top: 0;">任務成功 SUCCESS</h2>
+            
+            <div style="background: #050515; padding: 20px; border: 1px dashed var(--primary-blue); margin: 20px 0; border-radius: 8px;">
+                <p id="result-text" style="font-size: 1.25rem; line-height: 1.6; margin-bottom: 20px; white-space: pre-wrap; text-align: left;"></p>
+                
+                <div id="result-image-container" style="margin-top: 15px; display: flex; justify-content: center;">
+                    <!-- Result image injected by JS -->
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <button onclick="location.reload();" class="pixel-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow); margin: 0;">再玩一次 PLAY AGAIN</button>
+                <a href="{% url 'player_list' %}" class="pixel-btn pink" style="margin: 0; text-decoration: none; display: inline-block; padding: 10px 20px; line-height: 1.2;">選擇其他專案 BACK</a>
+            </div>
         </div>
+
     </div>
 </div>
 
@@ -50,6 +79,11 @@
     const maxErrorsAllowed = {{ project.max_errors|default:3 }};
     const projectImageUrls = {{ project_image_urls_json|default:'[]'|safe }};
     const globalTimeLimit = {{ project.time_limit|default:3600 }};
+
+    const successText = "{{ project.success_text|default:''|escapejs }}";
+    const successImageUrl = "{% if project.success_image %}{{ project.success_image.url }}{% endif %}";
+    const failureText = "{{ project.failure_text|default:''|escapejs }}";
+    const failureImageUrl = "{% if project.failure_image %}{{ project.failure_image.url }}{% endif %}";
 
     const startBtn = document.getElementById('start-btn');
     const endBtn = document.getElementById('end-btn');
@@ -106,8 +140,7 @@
             if (globalTimeRemaining <= 0) {
                 clearInterval(globalTimerInterval);
                 clearInterval(timerInterval);
-                storyTextDisplay.innerHTML += "<br><span style='color:red; font-weight:bold;'>⏳ 總時間到！炸彈已引爆！</span>";
-                setTimeout(() => resetGame("任務失敗！專案總時間超限。"), 2000);
+                showResults(false, "⏳ 總時間到！挑戰超限，任務失敗！");
             }
         }, 1000);
         
@@ -115,32 +148,49 @@
     });
 
     endBtn.addEventListener('click', () => {
-        resetGame("遊戲已結束。");
+        showResults(false, "遊戲已被強制結束。");
     });
 
-    function resetGame(statusText) {
+    function showResults(isWin, fallbackReason) {
         gameActive = false;
         clearInterval(timerInterval);
         clearInterval(globalTimerInterval);
-        startBtn.style.display = 'inline-block';
-        endBtn.style.display = 'none';
-        timerDisplay.textContent = "-- : --";
-        initGlobalTimer();
-        storyTextDisplay.textContent = statusText;
-        moduleImageContainer.style.display = 'none';
-        moduleImageContainer.innerHTML = '';
-        if (projectImageUrls.length > 0 && projectImageContainer) {
-            projectImageContainer.style.display = 'flex';
+        
+        // Hide game panel, show results panel
+        document.getElementById('game-panel').style.display = 'none';
+        const resultsPanel = document.getElementById('results-panel');
+        resultsPanel.style.display = 'block';
+        
+        const resultTitle = document.getElementById('result-title');
+        const resultText = document.getElementById('result-text');
+        const resultImgContainer = document.getElementById('result-image-container');
+        
+        resultImgContainer.innerHTML = '';
+        
+        if (isWin) {
+            resultTitle.textContent = "任務成功 SUCCESS";
+            resultTitle.style.color = "var(--neon-blue)";
+            resultTitle.style.textShadow = "0 0 15px var(--neon-blue)";
+            
+            resultText.textContent = successText ? successText : (fallbackReason || "恭喜通關所有模組！遊戲成功結束。");
+            if (successImageUrl) {
+                resultImgContainer.innerHTML = `<img src="${successImageUrl}" style="max-width: 100%; max-height: 250px; border: 2px solid var(--neon-blue); border-radius: 4px; box-shadow: 0 0 15px var(--neon-blue);">`;
+            }
+        } else {
+            resultTitle.textContent = "任務失敗 FAILED";
+            resultTitle.style.color = "var(--neon-pink)";
+            resultTitle.style.textShadow = "0 0 15px var(--neon-pink)";
+            
+            resultText.textContent = failureText ? failureText : (fallbackReason || "任務失敗！炸彈已引爆！");
+            if (failureImageUrl) {
+                resultImgContainer.innerHTML = `<img src="${failureImageUrl}" style="max-width: 100%; max-height: 250px; border: 2px solid var(--neon-pink); border-radius: 4px; box-shadow: 0 0 15px var(--neon-pink);">`;
+            }
         }
     }
 
     function loadModule(index) {
         if (index >= projectConfig.length) {
-            storyTextDisplay.innerHTML = "🎉 恭喜通關所有模組！遊戲結束。";
-            clearInterval(timerInterval);
-            clearInterval(globalTimerInterval);
-            timerDisplay.textContent = "00 : 00";
-            moduleImageContainer.style.display = 'none';
+            showResults(true, "🎉 恭喜通關所有模組！遊戲結束。");
             return;
         }
 
@@ -168,8 +218,7 @@
             updateTimerDisplay();
             if (timeRemaining <= 0) {
                 clearInterval(timerInterval);
-                storyTextDisplay.innerHTML += "<br><span style='color:red; font-weight:bold;'>⏳ 時間到！炸彈已引爆！</span>";
-                setTimeout(() => resetGame("任務失敗！時間超限。"), 2000);
+                showResults(false, "⏳ 時間到！關卡剩餘時間歸零，任務失敗！");
             }
         }, 1000);
     }
@@ -211,8 +260,8 @@
             
             if (errors >= maxErrorsAllowed) {
                 clearInterval(timerInterval);
-                storyTextDisplay.innerHTML += `<br><span style="color:red; font-weight:bold;">💥 錯誤達上限 (${maxErrorsAllowed}次)！炸彈引爆！</span>`;
-                setTimeout(() => resetGame("任務失敗！錯誤次數達上限。"), 2000);
+                clearInterval(globalTimerInterval);
+                showResults(false, `💥 錯誤達上限 (${maxErrorsAllowed}次)！任務失敗。`);
             } else {
                 storyTextDisplay.innerHTML += `<br><span style="color:var(--neon-pink)">⚠️ 錯誤觸發！目前累計 ${errors} 次錯誤。</span>`;
             }
