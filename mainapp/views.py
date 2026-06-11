@@ -243,6 +243,7 @@ def player_play(request, project_id):
           'failure_image_urls_json': json.dumps(failure_image_urls),
       })
 
+@csrf_exempt
 @login_required
 def api_start_game(request, project_id):
     if request.method != 'POST':
