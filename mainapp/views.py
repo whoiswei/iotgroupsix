@@ -352,6 +352,19 @@ def api_game_event(request):
         
     session.save()
     
+    # Notify Node-RED/Hardware that the game has ended
+    if session.status in ['failed', 'success']:
+        try:
+            import paho.mqtt.publish as mqtt_publish
+            mqtt_publish.single(
+                "escaperoom/game/stop",
+                payload=json.dumps({'session_id': session.id, 'status': session.status}),
+                hostname="127.0.0.1",
+                port=1883
+            )
+        except Exception:
+            pass
+    
     return JsonResponse({
         'status': 'success',
         'session_id': session.id,
