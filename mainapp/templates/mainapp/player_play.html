@@ -123,7 +123,7 @@
         startBtn.disabled = true;
 
         // 向 Django API 發送 POST 以啟動實體遊戲與發送 MQTT 設定
-        fetch(`/api/game/start/${{ project.id }}/`, {
+        fetch(`/api/game/start/{{ project.id }}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
