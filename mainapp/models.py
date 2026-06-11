@@ -61,3 +61,15 @@ class ProjectFailureImage(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='failure_images')
     image = models.ImageField(upload_to='project_failure/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+class GameSession(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE)
+    current_module_index = models.PositiveIntegerField(default=0)
+    errors_committed = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=20, default='playing')  # 'playing', 'success', 'failed'
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Session for {self.project.title} - Step {self.current_module_index} ({self.status})"

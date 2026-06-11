@@ -97,6 +97,8 @@
     let currentModuleIndex = 0;
     let timerInterval = null;
     let globalTimerInterval = null;
+    let statusPollInterval = null;
+    let currentSessionId = null;
     let timeRemaining = 0;
     let globalTimeRemaining = 0;
     let errors = 0;
@@ -117,44 +119,76 @@
             return;
         }
 
-        console.log("Publishing project config to MQTT topic 'iot_escape/project/start'...");
-        console.log(JSON.stringify(projectConfig));
-        
-        gameActive = true;
-        errors = 0;
-        errorsDisplay.textContent = "0";
-        
-        startBtn.style.display = 'none';
-        endBtn.style.display = 'inline-block';
-        if (projectImageUrls.length > 0 && projectImageContainer) {
-            projectImageContainer.style.display = 'none'; // 開始後隱藏專案大圖，留空間給關卡圖
-        }
-        
-        globalTimeRemaining = globalTimeLimit;
-        clearInterval(globalTimerInterval);
-        updateGlobalTimerDisplay();
-        
-        globalTimerInterval = setInterval(() => {
-            globalTimeRemaining--;
-            updateGlobalTimerDisplay();
-            if (globalTimeRemaining <= 0) {
-                clearInterval(globalTimerInterval);
-                clearInterval(timerInterval);
-                showResults(false, "⏳ 總時間到！挑戰超限，任務失敗！");
+        storyTextDisplay.textContent = "正在連線硬體，初始化關卡中...";
+        startBtn.disabled = true;
+
+        // 向 Django API 發送 POST 以啟動實體遊戲與發送 MQTT 設定
+        fetch(`/api/game/start/${{ project.id }}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
             }
-        }, 1000);
-        
-        loadModule(0);
+        })
+        .then(response => response.json())
+        .then(data => {
+            startBtn.disabled = false;
+            if (data.status === 'success') {
+                currentSessionId = data.session_id;
+                console.log("遊戲實體連線成功，Session ID:", currentSessionId);
+                
+                gameActive = true;
+                errors = 0;
+                errorsDisplay.textContent = "0";
+                
+                startBtn.style.display = 'none';
+                endBtn.style.display = 'inline-block';
+                if (projectImageUrls.length > 0 && projectImageContainer) {
+                    projectImageContainer.style.display = 'none';
+                }
+                
+                globalTimeRemaining = globalTimeLimit;
+                clearInterval(globalTimerInterval);
+                updateGlobalTimerDisplay();
+                
+                globalTimerInterval = setInterval(() => {
+                    globalTimeRemaining--;
+                    updateGlobalTimerDisplay();
+                    if (globalTimeRemaining <= 0) {
+                        clearInterval(globalTimerInterval);
+                        clearInterval(timerInterval);
+                        clearInterval(statusPollInterval);
+                        showResults(false, "⏳ 總時間到！挑戰超限，任務失敗！");
+                        sendGameEvent('game_over');
+                    }
+                }, 1000);
+                
+                loadModule(0);
+
+                // 每秒輪詢遊戲狀態（是否有 Pico W / Node-RED 過關或錯誤的狀態更新）
+                clearInterval(statusPollInterval);
+                statusPollInterval = setInterval(pollGameStatus, 1000);
+            } else {
+                storyTextDisplay.textContent = "無法啟動連線：" + data.message;
+            }
+        })
+        .catch(err => {
+            startBtn.disabled = false;
+            storyTextDisplay.textContent = "與伺服器連線失敗，請檢查網路狀態。";
+            console.error("Error starting game session:", err);
+        });
     });
 
     endBtn.addEventListener('click', () => {
         showResults(false, "遊戲已被強制結束。");
+        sendGameEvent('game_over');
     });
 
     function showResults(isWin, fallbackReason) {
         gameActive = false;
         clearInterval(timerInterval);
         clearInterval(globalTimerInterval);
+        clearInterval(statusPollInterval);
         
         // Hide game panel, show results panel
         document.getElementById('game-panel').style.display = 'none';
@@ -285,5 +319,53 @@
         globalTimerDisplay.textContent = `${mins} : ${secs}`;
     }
     initGlobalTimer();
+
+    // 輪詢與傳送事件的輔助函式
+    function pollGameStatus() {
+        if (!currentSessionId || !gameActive) return;
+        
+        fetch(`/api/game/status/${currentSessionId}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // 更新錯誤次數
+                if (data.errors_committed !== errors) {
+                    errors = data.errors_committed;
+                    errorsDisplay.textContent = errors;
+                }
+                
+                // 更新關卡索引（由 Node-RED/Pico 觸發了下一關）
+                if (data.current_module_index !== currentModuleIndex) {
+                    loadModule(data.current_module_index);
+                }
+                
+                // 檢查遊戲結局狀態
+                if (data.game_status === 'success') {
+                    clearInterval(statusPollInterval);
+                    showResults(true, "🎉 恭喜通關所有模組！遊戲成功結束。");
+                } else if (data.game_status === 'failed') {
+                    clearInterval(statusPollInterval);
+                    showResults(false, "⏳ 任務失敗！炸彈已引爆！");
+                }
+            }
+        })
+        .catch(err => console.error("Error polling status:", err));
+    }
+
+    function sendGameEvent(event) {
+        if (!currentSessionId) return;
+        fetch('/api/game/event/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                session_id: currentSessionId,
+                event: event
+            })
+        })
+        .catch(err => console.error("Error sending event:", err));
+    }
 </script>
 {% endblock %}

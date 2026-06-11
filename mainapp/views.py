@@ -3,8 +3,14 @@ from django.http import JsonResponse
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.decorators import login_required
-from .models import Project, ProjectModule, ProjectImage, ProjectModuleImage, ProjectSuccessImage, ProjectFailureImage
+from django.views.decorators.csrf import csrf_exempt
+from .models import Project, ProjectModule, ProjectImage, ProjectModuleImage, ProjectSuccessImage, ProjectFailureImage, GameSession
 import json
+
+try:
+    import paho.mqtt.publish as mqtt_publish
+except ImportError:
+    mqtt_publish = None
 
 def home(request):
     if request.user.is_authenticated:
@@ -236,3 +242,119 @@ def player_play(request, project_id):
           'success_image_urls_json': json.dumps(success_image_urls),
           'failure_image_urls_json': json.dumps(failure_image_urls),
       })
+
+@login_required
+def api_start_game(request, project_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method allowed'}, status=400)
+    
+    project = get_object_or_404(Project, id=project_id)
+    
+    # Deactivate any previous sessions for this project
+    GameSession.objects.filter(project=project, is_active=True).update(is_active=False)
+    
+    # Create new game session
+    session = GameSession.objects.create(
+        project=project,
+        current_module_index=0,
+        errors_committed=0,
+        status='playing',
+        is_active=True
+    )
+    
+    # Format module configurations to send to MQTT
+    modules_data = []
+    for mod in project.modules.all():
+        modules_data.append({
+            'order': mod.order,
+            'module_type': mod.module_type,
+            'module_name': mod.get_module_type_display(),
+            'time_limit': mod.time_limit,
+            'config': mod.config_data or {}
+        })
+        
+    mqtt_payload = {
+        'session_id': session.id,
+        'project_id': project.id,
+        'total_time': project.time_limit,
+        'max_errors': project.max_errors,
+        'modules': modules_data
+    }
+    
+    # Send MQTT message
+    mqtt_sent = False
+    if mqtt_publish:
+        try:
+            mqtt_publish.single(
+                "escaperoom/game/start",
+                payload=json.dumps(mqtt_payload),
+                hostname="127.0.0.1",
+                port=1883
+            )
+            mqtt_sent = True
+        except Exception as e:
+            pass
+
+    return JsonResponse({
+        'status': 'success',
+        'session_id': session.id,
+        'mqtt_sent': mqtt_sent
+    })
+
+@login_required
+def api_game_status(request, session_id):
+    session = get_object_or_404(GameSession, id=session_id)
+    return JsonResponse({
+        'status': 'success',
+        'session_id': session.id,
+        'current_module_index': session.current_module_index,
+        'errors_committed': session.errors_committed,
+        'game_status': session.status,
+        'is_active': session.is_active
+    })
+
+@csrf_exempt
+def api_game_event(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method allowed'}, status=400)
+        
+    try:
+        data = json.loads(request.body)
+        session_id = data.get('session_id')
+        event = data.get('event')  # 'module_solved', 'wrong_answer', 'game_over', 'game_win'
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': 'Invalid JSON body'}, status=400)
+        
+    session = get_object_or_404(GameSession, id=session_id)
+    
+    if not session.is_active or session.status != 'playing':
+        return JsonResponse({'status': 'success', 'message': 'Session is not active or game already ended', 'game_status': session.status})
+        
+    total_modules = session.project.modules.count()
+    
+    if event == 'module_solved':
+        session.current_module_index += 1
+        if session.current_module_index >= total_modules:
+            session.status = 'success'
+            session.is_active = False
+    elif event == 'wrong_answer':
+        session.errors_committed += 1
+        if session.errors_committed >= session.project.max_errors:
+            session.status = 'failed'
+            session.is_active = False
+    elif event == 'game_over':
+        session.status = 'failed'
+        session.is_active = False
+    elif event == 'game_win':
+        session.status = 'success'
+        session.is_active = False
+        
+    session.save()
+    
+    return JsonResponse({
+        'status': 'success',
+        'session_id': session.id,
+        'current_module_index': session.current_module_index,
+        'errors_committed': session.errors_committed,
+        'game_status': session.status
+    })
