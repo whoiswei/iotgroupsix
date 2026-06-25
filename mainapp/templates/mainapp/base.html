@@ -33,14 +33,15 @@
     function updateLedBtnUI(isOn) {
         const btn = document.getElementById('pi-led-btn');
         if (!btn) return;
+        // 注意：因為硬體是反相 (0=亮, 1=暗)，所以當 isOn 為 false (0) 時，代表燈亮著
         if (!isOn) {
             btn.style.backgroundColor = '#00ff00';
             btn.style.color = '#000000';
-            btn.innerText = '💡 LED (按此關閉)';
+            btn.innerText = '💡 LED (開)';
         } else {
             btn.style.backgroundColor = 'transparent';
             btn.style.color = '#00ff00';
-            btn.innerText = '💡 LED (按此開啟)';
+            btn.innerText = '💡 LED (關)';
         }
     }
 
