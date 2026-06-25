@@ -33,7 +33,7 @@
     function updateLedBtnUI(isOn) {
         const btn = document.getElementById('pi-led-btn');
         if (!btn) return;
-        if (isOn) {
+        if (!isOn) {
             btn.style.backgroundColor = '#00ff00';
             btn.style.color = '#000000';
             btn.innerText = '💡 LED (按此關閉)';
