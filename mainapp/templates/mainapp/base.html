@@ -4,15 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>實境解謎裝置</title>
+    <title>第 6 組實境解謎</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
 <body>
     <div class="navbar">
         <a href="{% url 'home' %}" style="color:var(--neon-yellow); text-decoration:none;">
-            <h2>實境解謎裝置 IoT Escape</h2>
+            <h2>第 6 組實境解謎 Group 6 IoT Escape</h2>
         </a>
         <div>
+            <a href="http://{{ request.get_host | slice:':-5' }}:1880/ui" target="_blank" class="pixel-btn" style="border-color: var(--neon-blue); color: var(--neon-blue); margin-right: 15px;">👉 Node-RED</a>
             {% if user.is_authenticated %}
                 <span style="margin-right: 15px; color: var(--neon-pink);">Welcome, {{ user.username }}</span>
                 <button onclick="togglePiLed()" id="pi-led-btn" class="pixel-btn" style="border-color: #00ff00; color: #00ff00; margin-right: 15px; cursor: pointer;">💡 樹莓派 LED</button>
