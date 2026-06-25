@@ -165,9 +165,9 @@
                 
                 loadModule(0);
 
-                // 每秒輪詢遊戲狀態（是否有 Pico W / Node-RED 過關或錯誤的狀態更新）
+                // 每秒 5 次輪詢遊戲狀態（是否有 Pico W / Node-RED 過關或錯誤的狀態更新）
                 clearInterval(statusPollInterval);
-                statusPollInterval = setInterval(pollGameStatus, 1000);
+                statusPollInterval = setInterval(pollGameStatus, 200);
             } else {
                 storyTextDisplay.textContent = "無法啟動連線：" + data.message;
             }
