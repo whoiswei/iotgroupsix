@@ -15,6 +15,7 @@
         <div>
             {% if user.is_authenticated %}
                 <span style="margin-right: 15px; color: var(--neon-pink);">Welcome, {{ user.username }}</span>
+                <button onclick="togglePiLed()" class="pixel-btn" style="border-color: #00ff00; color: #00ff00; margin-right: 15px; cursor: pointer;">💡 樹莓派 LED</button>
                 <a href="{% url 'dashboard' %}" class="pixel-btn">Dashboard</a>
                 <a href="{% url 'logout' %}" class="pixel-btn pink">登出</a>
             {% else %}
@@ -22,6 +23,25 @@
             {% endif %}
         </div>
     </div>
+    
+    <script>
+    function togglePiLed() {
+        fetch('/api/toggle-pi-led/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') {
+                console.log('LED toggle command sent via MQTT');
+            } else {
+                console.error('Error:', data.message);
+            }
+        }).catch(err => console.error(err));
+    }
+    </script>
+
     
     <div class="heart-container">
         <div class="pixel-heart blue"></div>

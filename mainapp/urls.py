@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/game/start/<int:project_id>/', views.api_start_game, name='api_start_game'),
     path('api/game/status/<int:session_id>/', views.api_game_status, name='api_game_status'),
     path('api/game/event/', views.api_game_event, name='api_game_event'),
+    path('api/toggle-pi-led/', views.toggle_pi_led, name='toggle_pi_led'),
 ]
