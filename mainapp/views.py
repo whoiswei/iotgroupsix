@@ -372,3 +372,19 @@ def api_game_event(request):
         'errors_committed': session.errors_committed,
         'game_status': session.status
     })
+
+@csrf_exempt
+def toggle_pi_led(request):
+    if request.method == 'POST':
+        try:
+            import paho.mqtt.publish as mqtt_publish
+            mqtt_publish.single(
+                "escaperoom/pi/led_toggle",
+                payload=json.dumps({'action': 'toggle'}),
+                hostname="127.0.0.1",
+                port=1883
+            )
+            return JsonResponse({'status': 'success', 'message': 'MQTT sent'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
