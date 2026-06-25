@@ -15,7 +15,7 @@
         <div>
             {% if user.is_authenticated %}
                 <span style="margin-right: 15px; color: var(--neon-pink);">Welcome, {{ user.username }}</span>
-                <button onclick="togglePiLed()" class="pixel-btn" style="border-color: #00ff00; color: #00ff00; margin-right: 15px; cursor: pointer;">💡 樹莓派 LED</button>
+                <button onclick="togglePiLed()" id="pi-led-btn" class="pixel-btn" style="border-color: #00ff00; color: #00ff00; margin-right: 15px; cursor: pointer;">💡 樹莓派 LED</button>
                 <a href="{% url 'dashboard' %}" class="pixel-btn">Dashboard</a>
                 <a href="{% url 'logout' %}" class="pixel-btn pink">登出</a>
             {% else %}
@@ -25,6 +25,25 @@
     </div>
     
     <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const ledState = localStorage.getItem('pi_led_state') === '1';
+        updateLedBtnUI(ledState);
+    });
+
+    function updateLedBtnUI(isOn) {
+        const btn = document.getElementById('pi-led-btn');
+        if (!btn) return;
+        if (isOn) {
+            btn.style.backgroundColor = '#00ff00';
+            btn.style.color = '#000000';
+            btn.innerText = '💡 LED (開)';
+        } else {
+            btn.style.backgroundColor = 'transparent';
+            btn.style.color = '#00ff00';
+            btn.innerText = '💡 LED (關)';
+        }
+    }
+
     function togglePiLed() {
         fetch('/api/toggle-pi-led/', {
             method: 'POST',
@@ -34,6 +53,10 @@
             }
         }).then(res => res.json()).then(data => {
             if(data.status === 'success') {
+                const currentState = localStorage.getItem('pi_led_state') === '1';
+                const newState = !currentState;
+                localStorage.setItem('pi_led_state', newState ? '1' : '0');
+                updateLedBtnUI(newState);
                 console.log('LED toggle command sent via MQTT');
             } else {
                 console.error('Error:', data.message);
