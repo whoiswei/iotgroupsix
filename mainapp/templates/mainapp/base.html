@@ -13,7 +13,7 @@
             <h2>第 6 組實境解謎 Group 6 IoT Escape</h2>
         </a>
         <div>
-            <a href="http://{{ request.get_host | slice:':-5' }}:1880/ui" target="_blank" class="pixel-btn" style="border-color: var(--neon-blue); color: var(--neon-blue); margin-right: 15px;">👉 Node-RED</a>
+            <a href="http://100.97.224.8:1880/ui" target="_blank" class="pixel-btn" style="border-color: var(--neon-blue); color: var(--neon-blue); margin-right: 15px;">👉 Node-RED</a>
             {% if user.is_authenticated %}
                 <span style="margin-right: 15px; color: var(--neon-pink);">Welcome, {{ user.username }}</span>
                 <button onclick="togglePiLed()" id="pi-led-btn" class="pixel-btn" style="border-color: #00ff00; color: #00ff00; margin-right: 15px; cursor: pointer;">💡 樹莓派 LED</button>
